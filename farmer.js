@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 var SteamUser = require('steam-user');
-var Steam = SteamUser.Steam;
 var prompt = require('prompt');
 var request = require('request');
 var Cheerio = require('cheerio');
@@ -281,4 +280,3 @@ function shutdown(code) {
 		process.exit(code);
 	}, 500);
 }
-
