@@ -2,8 +2,12 @@
 	"name": "steam-card-farmer",
 	"description": "Automatically farms card drops for Steam games you own with remaining drops",
 	"version": "2.0.2",
+	"license": "MIT",
 	"bin": {
 		"steamcardfarmer": "./farmer.js"
+	},
+	"scripts": {
+		"test": "eslint ."
 	},
 	"preferGlobal": true,
 	"repository": {
@@ -16,5 +20,9 @@
 		"request": "^2.88.0",
 		"steam-user": "^3.29.1"
 	},
-	"license": "MIT"
+	"devDependencies": {
+		"eslint": "^5.3.0",
+		"eslint-config-airbnb-base": "^13.1.0",
+		"eslint-plugin-import": "^2.14.0"
+	}
 }

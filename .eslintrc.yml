@@ -1,0 +1,12 @@
+extends: airbnb-base
+
+env:
+  node: true
+
+rules:
+  camelcase: off
+  indent: [error, tab]
+  max-len: off
+  no-console: off
+  no-plusplus: off
+  no-tabs: off
