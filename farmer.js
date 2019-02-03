@@ -198,13 +198,19 @@ function checkCardApps() {
 			g_Jar.setCookie(cookie, 'https://steamcommunity.com');
 		});
 		
-		request("https://steamcommunity.com/my/badges/?p="+g_Page, function(err, response, body) {
+		request("https://steamcommunity.com/my/badges/?l=english&p="+g_Page, function(err, response, body) {
 			if(err || response.statusCode != 200) {
 				log("Couldn't request badge page: " + (err || "HTTP error " + response.statusCode));
 				checkCardsInSeconds(30);
 				return;
 			}
 			
+			if (body.includes("g_steamID = false")) {
+				log("Badge page loaded, but its logged out");
+				checkCardsInSeconds(30);
+				return;
+			}
+
 			var appsWithDrops = 0;
 			var totalDropsLeft = 0;
 			var appLaunched = false;
