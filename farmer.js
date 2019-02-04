@@ -13,6 +13,7 @@ request = request.defaults({ jar: g_Jar });
 
 let g_Page = 1;
 let g_CheckTimer;
+let g_WasBlocked = false;
 
 function log(message) {
 	const date = new Date();
@@ -174,6 +175,7 @@ if (process.argv.length === argsStartIdx + 2) {
 	client.logOn({
 		accountName: process.argv[argsStartIdx],
 		password: process.argv[argsStartIdx + 1],
+		logonID: 66666666,
 	});
 } else {
 	prompt.start();
@@ -201,6 +203,7 @@ if (process.argv.length === argsStartIdx + 2) {
 		client.logOn({
 			accountName: result.username,
 			password: result.password,
+			logonID: 66666666,
 		});
 	});
 }
@@ -229,12 +232,18 @@ client.on('newItems', (count) => {
 });
 
 client.on('playingState', (blocked, appid) => {
+	if (g_WasBlocked === blocked) {
+		return;
+	}
+
+	g_WasBlocked = blocked;
+
 	if (!blocked) {
 		log('Account no longer blocked on another session, resuming idling...');
 
 		g_Page = 1;
 
-		checkCardsInSeconds(1000);
+		checkCardsInSeconds(1);
 
 		return;
 	}
