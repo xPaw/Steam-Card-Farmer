@@ -15,7 +15,7 @@ Designed for advanced users.
 
 On the command line, just type `node farmer.js`. Optionally include your username and password as arguments, as such: `node farmer.js steamusername steampassword`.
 
-If not provided on the command line, it'll prompt you for your Steam username and password. Just because it invariably ends up with someone asking about it, **when you enter your password, no characters will show up**. Don't worry, you're typing.
+If not provided on the command line, it'll prompt you for your Steam username and password.
 
 If you have games with remaining drops which have less than 2 hours of playtime, the app will first mass-idle all of them up to 2 hours. Then it will start switching through them to get card drops. If you have purchased a game in the past 14 days, **idling it will waive your right to a refund on Steam**.
 

@@ -16,9 +16,16 @@ let g_CheckTimer;
 
 function log(message) {
 	const date = new Date();
-	const time = [date.getFullYear(), date.getMonth() + 1, date.getDate(), date.getHours(), date.getMinutes(), date.getSeconds()];
+	const time = [
+		date.getFullYear(),
+		date.getMonth() + 1,
+		date.getDate(),
+		date.getHours(),
+		date.getMinutes(),
+		date.getSeconds(),
+	];
 
-	for (let i = 1; i < 6; i++) {
+	for (let i = 1; i < 6; i += 1) {
 		if (time[i] < 10) {
 			time[i] = `0${time[i]}`;
 		}
@@ -76,15 +83,14 @@ function checkCardApps() {
 			const hasDropsApps = [];
 
 			const $ = Cheerio.load(body);
-			const infolines = $('.progress_info_bold');
 
-			for (let i = 0; i < infolines.length; i++) {
-				const match = $(infolines[i]).text().match(/(\d+)/);
-				const row = $(infolines[i]).closest('.badge_row');
+			$('.progress_info_bold').each((index, infoline) => {
+				const match = $(infoline).text().match(/(\d+)/);
+				const row = $(infoline).closest('.badge_row');
 				const href = row.find('.badge_title_playgame a').attr('href');
 
 				if (!match || !href) {
-					continue;
+					return;
 				}
 
 				const urlparts = href.split('/');
@@ -92,7 +98,7 @@ function checkCardApps() {
 				const drops = parseInt(match[1], 10) || 0;
 
 				if (appid < 1 || drops < 1) {
-					continue;
+					return;
 				}
 
 				let title = row.find('.badge_title');
@@ -112,7 +118,7 @@ function checkCardApps() {
 				} else {
 					hasDropsApps.push(appObj);
 				}
-			}
+			});
 
 			if (lowHourApps.length > 0) {
 				let minPlaytime = 2.0;
@@ -142,16 +148,16 @@ function checkCardApps() {
 
 				client.gamesPlayed(appToIdle.appid);
 
-				// 20 minutes to be safe, we should automatically check when Steam notifies us that we got a new item anyway
+				// 20 minutes to be safe, we should automatically check when
+				// Steam notifies us that we got a new item anyway
 				checkCardsInSeconds(1200);
 			} else if (g_Page <= (parseInt($('.pagelink').last().text(), 10) || 1)) {
 				log(`No drops remaining on page ${g_Page}`);
-				g_Page++;
+				g_Page += 1;
 				log(`Checking page ${g_Page}`);
 				checkCardsInSeconds(1);
 			} else {
-				log('All card drops recieved!');
-				log('Shutting Down.');
+				log('All card drops recieved! Shutting down...');
 				shutdown(0);
 			}
 		});
@@ -174,10 +180,13 @@ if (process.argv.length === argsStartIdx + 2) {
 	prompt.get({
 		properties: {
 			username: {
+				type: 'string',
 				required: true,
 			},
 			password: {
+				type: 'string',
 				hidden: true,
+				replace: '*',
 				required: true,
 			},
 		},
@@ -197,7 +206,7 @@ if (process.argv.length === argsStartIdx + 2) {
 }
 
 process.on('SIGINT', () => {
-	log('Logging off and shutting down');
+	log('Logging off and shutting down...');
 	shutdown(0);
 });
 
