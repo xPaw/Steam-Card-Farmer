@@ -13,7 +13,6 @@ request = request.defaults({ jar: g_Jar });
 
 let g_Page = 1;
 let g_CheckTimer;
-let g_OwnedApps = [];
 
 function log(message) {
 	const date = new Date();
@@ -39,11 +38,15 @@ function shutdown(code) {
 	}, 500);
 }
 
-function checkCardApps() {
+function checkCardsInSeconds(seconds) {
 	if (g_CheckTimer) {
 		clearTimeout(g_CheckTimer);
 	}
 
+	g_CheckTimer = setTimeout(checkCardApps, 1000 * seconds);
+}
+
+function checkCardApps() {
 	log('Checking card drops...');
 
 	client.webLogOn();
@@ -52,7 +55,11 @@ function checkCardApps() {
 			g_Jar.setCookie(cookie, 'https://steamcommunity.com');
 		});
 
-		request(`https://steamcommunity.com/my/badges/?l=english&p=${g_Page}`, (err, response, body) => {
+		request({
+			url: `https://steamcommunity.com/my/badges/?l=english&p=${g_Page}`,
+			maxRedirects: 1,
+			timeout: 30000,
+		}, (err, response, body) => {
 			if (err || response.statusCode !== 200) {
 				log(`Couldn't request badge page: ${err || `HTTP error ${response.statusCode}`}`);
 				checkCardsInSeconds(30);
@@ -65,137 +72,47 @@ function checkCardApps() {
 				return;
 			}
 
-			let appsWithDrops = 0;
-			let totalDropsLeft = 0;
-			let appLaunched = false;
+			const lowHourApps = [];
+			const hasDropsApps = [];
 
 			const $ = Cheerio.load(body);
 			const infolines = $('.progress_info_bold');
 
 			for (let i = 0; i < infolines.length; i++) {
 				const match = $(infolines[i]).text().match(/(\d+)/);
+				const row = $(infolines[i]).closest('.badge_row');
+				const href = row.find('.badge_title_playgame a').attr('href');
 
-				const href = $(infolines[i]).closest('.badge_row').find('.badge_title_playgame a').attr('href');
-				if (!href) {
+				if (!match || !href) {
 					continue;
 				}
 
 				const urlparts = href.split('/');
-				const appid = parseInt(urlparts[urlparts.length - 1], 10);
-				const drops = parseInt(match[1], 10);
+				const appid = parseInt(urlparts[urlparts.length - 1], 10) || 0;
+				const drops = parseInt(match[1], 10) || 0;
 
-				if (!match || !drops || g_OwnedApps.indexOf(appid) === -1) {
+				if (appid < 1 || drops < 1) {
 					continue;
 				}
 
-				appsWithDrops++;
-				totalDropsLeft += drops;
+				let title = row.find('.badge_title');
+				title.find('.badge_view_details').remove();
+				title = title.text().trim();
 
-				if (!appLaunched) {
-					appLaunched = true;
-
-					let title = $(infolines[i]).closest('.badge_row').find('.badge_title');
-					title.find('.badge_view_details').remove();
-					title = title.text().trim();
-
-					log(`Idling app ${appid} "${title}" - ${drops} drop${drops === 1 ? '' : 's'} remaining`);
-					client.gamesPlayed(appid);
-				}
-			}
-
-			log(`${totalDropsLeft} card drop${totalDropsLeft === 1 ? '' : 's'} remaining across ${appsWithDrops} app${appsWithDrops === 1 ? '' : 's'} (Page ${g_Page})`);
-			if (totalDropsLeft === 0) {
-				const maxPages = parseInt($('.pagelink').last().text(), 10) || 1;
-
-				if (g_Page <= maxPages) {
-					log(`No drops remaining on page ${g_Page}`);
-					g_Page++;
-					log(`Checking page ${g_Page}`);
-					checkMinPlaytime();
-				} else {
-					log('All card drops recieved!');
-					log('Shutting Down.');
-					shutdown(0);
-				}
-			} else {
-				checkCardsInSeconds(1200); // 20 minutes to be safe, we should automatically check when Steam notifies us that we got a new item anyway
-			}
-		});
-	});
-}
-
-function checkMinPlaytime() {
-	log('Checking app playtime...');
-
-	client.webLogOn();
-	client.once('webSession', (sessionID, cookies) => {
-		cookies.forEach((cookie) => {
-			g_Jar.setCookie(cookie, 'https://steamcommunity.com');
-		});
-
-		request(`https://steamcommunity.com/my/badges/?p=${g_Page}`, (err, response, body) => {
-			if (err || response.statusCode !== 200) {
-				log(`Couldn't request badge page: ${err || `HTTP error ${response.statusCode}`}. Retrying in 10 seconds...`);
-				setTimeout(checkMinPlaytime, 10000);
-				return;
-			}
-
-			const lowHourApps = [];
-
-			const $ = Cheerio.load(body);
-			$('.badge_row').each((index, element) => {
-				const row = $(element);
-				const overlay = row.find('.badge_row_overlay');
-				if (!overlay) {
-					return;
-				}
-
-				const match = overlay.attr('href').match(/\/gamecards\/(\d+)/);
-				if (!match) {
-					return;
-				}
-
-				const appid = parseInt(match[1], 10);
-
-				let name = row.find('.badge_title');
-				name.find('.badge_view_details').remove();
-				name = name.text().replace(/\n/g, '').replace(/\r/g, '').replace(/\t/g, '')
-					.trim();
-
-				// Find out if we have drops left
-				let drops = row.find('.progress_info_bold').text().match(/(\d+)/);
-				if (!drops) {
-					return;
-				}
-
-				drops = parseInt(drops[1], 10);
-				if (Number.isNaN(drops) || drops < 1) {
-					return;
-				}
-
-				// Find out playtime
-				let playtime = row.find('.badge_title_stats').html().match(/(\d+\.\d+)/);
-				if (!playtime) {
-					playtime = 0.0;
-				} else {
-					playtime = parseFloat(playtime[1], 10);
-					if (Number.isNaN(playtime)) {
-						playtime = 0.0;
-					}
-				}
+				const playtime = parseFloat(row.find('.badge_title_stats').html().match(/(\d+\.\d+)/), 10) || 0.0;
+				const appObj = {
+					appid,
+					title,
+					playtime,
+					drops,
+				};
 
 				if (playtime < 2.0) {
-					// It needs hours!
-
-					lowHourApps.push({
-						appid,
-						name,
-						playtime,
-					});
+					lowHourApps.push(appObj);
 				} else {
-					g_OwnedApps.push(appid);
+					hasDropsApps.push(appObj);
 				}
-			});
+			}
 
 			if (lowHourApps.length > 0) {
 				let minPlaytime = 2.0;
@@ -208,29 +125,37 @@ function checkMinPlaytime() {
 					log(`App ${app.appid} - ${app.name} - Playtime: ${app.playtime}`);
 				});
 
-				const lowAppsToIdle = lowHourApps.map(app => app.appid);
+				log(`Idling ${lowHourApps.length} app${lowHourApps.length === 1 ? '' : 's'} up to 2 hours.`);
+				log(`You likely won't receive any card drops in this time.\nThis will take ${2.0 - minPlaytime} hours.`);
 
-				if (lowAppsToIdle.length < 1) {
-					checkCardApps();
-				} else {
-					g_OwnedApps = g_OwnedApps.concat(lowAppsToIdle);
-					client.gamesPlayed(lowAppsToIdle);
-					log(`Idling ${lowAppsToIdle.length} app${lowAppsToIdle.length === 1 ? '' : 's'} up to 2 hours.`);
-					log(`You likely won't receive any card drops in this time.\nThis will take ${2.0 - minPlaytime} hours.`);
-					setTimeout(() => {
-						client.gamesPlayed([]);
-						checkCardApps();
-					}, (1000 * 60 * 60 * (2.0 - minPlaytime)));
-				}
+				client.gamesPlayed(lowHourApps.map(app => app.appid));
+
+				const delay = 60 * 60 * (2.0 - minPlaytime);
+				setTimeout(() => client.gamesPlayed([]), 1000 * delay);
+				checkCardsInSeconds(delay);
+			} else if (hasDropsApps.length > 0) {
+				const totalDropsLeft = hasDropsApps.reduce((a, val) => val + a.drops, 0);
+				const appToIdle = hasDropsApps[0];
+
+				log(`${totalDropsLeft} card drop${totalDropsLeft === 1 ? '' : 's'} remaining across ${hasDropsApps.length} app${hasDropsApps.length === 1 ? '' : 's'} (Page ${g_Page})`);
+				log(`Idling app ${appToIdle.appid} "${appToIdle.title}" - ${appToIdle.drops} drop${appToIdle.drops === 1 ? '' : 's'} remaining`);
+
+				client.gamesPlayed(appToIdle.appid);
+
+				// 20 minutes to be safe, we should automatically check when Steam notifies us that we got a new item anyway
+				checkCardsInSeconds(1200);
+			} else if (g_Page <= (parseInt($('.pagelink').last().text(), 10) || 1)) {
+				log(`No drops remaining on page ${g_Page}`);
+				g_Page++;
+				log(`Checking page ${g_Page}`);
+				checkCardsInSeconds(1);
 			} else {
-				checkCardApps();
+				log('All card drops recieved!');
+				log('Shutting Down.');
+				shutdown(0);
 			}
 		});
 	});
-}
-
-function checkCardsInSeconds(seconds) {
-	g_CheckTimer = setTimeout(checkCardApps, (1000 * seconds));
 }
 
 let argsStartIdx = 2;
@@ -278,7 +203,7 @@ process.on('SIGINT', () => {
 
 client.on('loggedOn', () => {
 	log('Logged into Steam!');
-	checkMinPlaytime();
+	checkCardsInSeconds(1);
 });
 
 client.on('error', (e) => {
@@ -286,10 +211,10 @@ client.on('error', (e) => {
 });
 
 client.on('newItems', (count) => {
-	if (g_OwnedApps.length === 0 || count === 0) {
+	if (count === 0) {
 		return;
 	}
 
 	log(`Got notification of new inventory items: ${count} new item${count === 1 ? '' : 's'}`);
-	checkCardApps();
+	checkCardsInSeconds(1);
 });
