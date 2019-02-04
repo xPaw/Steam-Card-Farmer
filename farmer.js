@@ -141,7 +141,7 @@ function checkCardApps() {
 				setTimeout(() => client.gamesPlayed([]), 1000 * delay);
 				checkCardsInSeconds(delay);
 			} else if (hasDropsApps.length > 0) {
-				const totalDropsLeft = hasDropsApps.reduce((a, val) => val + a.drops, 0);
+				const totalDropsLeft = hasDropsApps.reduce((sum, { drops }) => sum + drops, 0);
 				const appToIdle = hasDropsApps[0];
 
 				log(`${totalDropsLeft} card drop${totalDropsLeft === 1 ? '' : 's'} remaining across ${hasDropsApps.length} app${hasDropsApps.length === 1 ? '' : 's'} (Page ${g_Page})`);
