@@ -124,6 +124,7 @@ function checkCardApps() {
 			if (lowHourApps.length > 0) {
 				let minPlaytime = 2.0;
 
+				lowHourApps = lowHourApps.slice(0, 32);
 				lowHourApps.forEach((app) => {
 					if (app.playtime < minPlaytime) {
 						minPlaytime = app.playtime;
