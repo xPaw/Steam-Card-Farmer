@@ -221,10 +221,18 @@ client.on('loggedOn', () => {
 
 client.on('error', (e) => {
 	log(`Error: ${e}`);
+
+	if (g_CheckTimer) {
+		clearTimeout(g_CheckTimer);
+	}
 });
 
 client.on('disconnected', (eResult, msg) => {
 	log(`Disconnected: Eresult.${eResult} - ${msg}`);
+
+	if (g_CheckTimer) {
+		clearTimeout(g_CheckTimer);
+	}
 });
 
 client.on('newItems', (count) => {
