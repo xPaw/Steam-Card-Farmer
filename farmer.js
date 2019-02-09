@@ -46,12 +46,18 @@ function shutdown(code) {
 	}, 500);
 }
 
-function checkCardsInSeconds(seconds) {
+function checkCardsInSeconds(seconds, callback) {
 	if (g_CheckTimer) {
 		clearTimeout(g_CheckTimer);
 	}
 
-	g_CheckTimer = setTimeout(checkCardApps, 1000 * seconds);
+	g_CheckTimer = setTimeout(() => {
+		if (callback) {
+			callback();
+		}
+
+		checkCardApps();
+	}, 1000 * seconds);
 }
 
 function checkCardApps() {
@@ -139,8 +145,10 @@ function checkCardApps() {
 				client.gamesPlayed(lowHourApps.map(app => app.appid));
 
 				const delay = 60 * 60 * (2.0 - minPlaytime);
-				setTimeout(() => client.gamesPlayed([]), 1000 * delay);
-				checkCardsInSeconds(delay);
+				checkCardsInSeconds(delay, () => {
+					log('Stopped idling previous apps');
+					client.gamesPlayed([]);
+				});
 			} else if (hasDropsApps.length > 0) {
 				const totalDropsLeft = hasDropsApps.reduce((sum, { drops }) => sum + drops, 0);
 				const appToIdle = hasDropsApps[0];
