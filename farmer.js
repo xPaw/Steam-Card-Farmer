@@ -130,11 +130,11 @@ function checkCardApps() {
 						minPlaytime = app.playtime;
 					}
 
-					log(`App ${app.appid} - ${app.name} - Playtime: ${app.playtime}`);
+					log(`App ${app.appid} - ${app.title} - Playtime: ${app.playtime}`);
 				});
 
 				log(`Idling ${lowHourApps.length} app${lowHourApps.length === 1 ? '' : 's'} up to 2 hours.`);
-				log(`You likely won't receive any card drops in this time.\nThis will take ${2.0 - minPlaytime} hours.`);
+				log(`This will take ${2.0 - minPlaytime} hours.`);
 
 				client.gamesPlayed(lowHourApps.map(app => app.appid));
 
