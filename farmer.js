@@ -80,7 +80,7 @@ function checkCardApps() {
 				return;
 			}
 
-			const lowHourApps = [];
+			let lowHourApps = [];
 			const hasDropsApps = [];
 
 			const $ = Cheerio.load(body);
