@@ -216,11 +216,15 @@ process.on('SIGINT', () => {
 
 client.on('loggedOn', () => {
 	log('Logged into Steam!');
-	checkCardsInSeconds(1);
+	checkCardApps();
 });
 
 client.on('error', (e) => {
 	log(`Error: ${e}`);
+});
+
+client.on('disconnected', (eResult, msg) => {
+	log(`Disconnected: Eresult.${eResult} - ${msg}`);
 });
 
 client.on('newItems', (count) => {
