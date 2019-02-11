@@ -112,7 +112,9 @@ function checkCardApps() {
 				title.find('.badge_view_details').remove();
 				title = title.text().trim();
 
-				const playtime = parseFloat(row.find('.badge_title_stats').html().match(/(\d+\.\d+)/), 10) || 0.0;
+				let playtime = parseFloat(row.find('.badge_title_stats').html().match(/(\d+\.\d+)/), 10) || 0.0;
+				playtime = Math.round(playtime * 60);
+
 				const appObj = {
 					appid,
 					title,
@@ -120,7 +122,7 @@ function checkCardApps() {
 					drops,
 				};
 
-				if (playtime < 2.0) {
+				if (playtime < 120) {
 					lowHourApps.push(appObj);
 				} else {
 					hasDropsApps.push(appObj);
@@ -128,7 +130,7 @@ function checkCardApps() {
 			});
 
 			if (lowHourApps.length > 0) {
-				let minPlaytime = 2.0;
+				let minPlaytime = 120;
 
 				lowHourApps = lowHourApps.slice(0, 32);
 				lowHourApps.forEach((app) => {
@@ -136,15 +138,15 @@ function checkCardApps() {
 						minPlaytime = app.playtime;
 					}
 
-					log(`App ${app.appid} - ${app.title} - Playtime: ${app.playtime}`);
+					log(`App ${app.appid} - ${app.title} - Playtime: ${app.playtime} min`);
 				});
 
 				log(`Idling ${lowHourApps.length} app${lowHourApps.length === 1 ? '' : 's'} up to 2 hours.`);
-				log(`This will take ${2.0 - minPlaytime} hours.`);
+				log(`This will take ${minPlaytime} minutes.`);
 
 				client.gamesPlayed(lowHourApps.map(app => app.appid));
 
-				const delay = 60 * 60 * (2.0 - minPlaytime);
+				const delay = 60 * (120 - minPlaytime);
 				checkCardsInSeconds(delay, () => {
 					log('Stopped idling previous apps');
 					client.gamesPlayed([]);
