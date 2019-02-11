@@ -13,7 +13,6 @@ request = request.defaults({ jar: g_Jar });
 
 let g_Page = 1;
 let g_CheckTimer;
-let g_WasBlocked = false;
 
 function log(message) {
 	const date = new Date();
@@ -141,32 +140,6 @@ client.on('newItems', (count) => {
 
 	log(`Got notification of new inventory items: ${count} new item${count === 1 ? '' : 's'}`);
 	checkCardsInSeconds(1);
-});
-
-client.on('playingState', (blocked, appid) => {
-	if (g_WasBlocked === blocked) {
-		return;
-	}
-
-	g_WasBlocked = blocked;
-
-	if (!blocked) {
-		log('Account no longer blocked on another session, resuming idling...');
-
-		g_Page = 1;
-
-		checkCardsInSeconds(1);
-
-		return;
-	}
-
-	log(`Started playing App ${appid} on this account using another session, idling stopped.`);
-
-	client.gamesPlayed([]);
-
-	if (g_CheckTimer) {
-		clearTimeout(g_CheckTimer);
-	}
 });
 
 client.on('webSession', (sessionID, cookies) => {
