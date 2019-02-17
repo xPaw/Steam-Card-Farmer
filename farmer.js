@@ -149,10 +149,19 @@ client.on('webSession', (sessionID, cookies) => {
 		g_Jar.setCookie(cookie, 'https://steamcommunity.com');
 	});
 
+	let url = 'https://steamcommunity.com/';
+
+	if (client.vanityURL) {
+		url += `id/${client.vanityURL}`;
+	} else {
+		url += `profiles/${client.steamID.getSteamID64()}`;
+	}
+
 	request({
-		url: `https://steamcommunity.com/my/badges/?l=english&p=${g_Page}`,
-		maxRedirects: 1,
-		timeout: 30000,
+		url: `${url}/badges/?l=english&p=${g_Page}`,
+		gzip: true,
+		followRedirect: false,
+		timeout: 10000,
 	}, (err, response, body) => {
 		if (err || response.statusCode !== 200) {
 			log(`Couldn't request badge page: ${err || `HTTP error ${response.statusCode}`}`);
