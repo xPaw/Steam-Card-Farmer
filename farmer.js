@@ -221,13 +221,13 @@ client.on('webSession', (sessionID, cookies) => {
 				log(`App ${app.appid} - ${app.title} - Playtime: ${app.playtime} min`);
 			});
 
-			log(`Idling ${lowHourApps.length} app${lowHourApps.length === 1 ? '' : 's'} up to 2 hours.`);
-			log(`This will take ${minPlaytime} minutes.`);
+			minPlaytime = 120 - minPlaytime;
+
+			log(`Idling ${lowHourApps.length} app${lowHourApps.length === 1 ? '' : 's'} up to 2 hours. This will take ${minPlaytime} minutes.`);
 
 			client.gamesPlayed(lowHourApps.map(app => app.appid));
 
-			const delay = 60 * (120 - minPlaytime);
-			checkCardsInSeconds(delay, () => {
+			checkCardsInSeconds(60 * minPlaytime, () => {
 				log('Stopped idling previous apps');
 				client.gamesPlayed([]);
 			});
