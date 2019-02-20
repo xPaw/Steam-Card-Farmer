@@ -2,6 +2,7 @@
 
 const SteamUser = require('steam-user');
 const prompt = require('prompt');
+const chalk = require('chalk');
 const Cheerio = require('cheerio');
 
 const client = new SteamUser();
@@ -32,7 +33,9 @@ function log(message) {
 		}
 	}
 
-	console.log(`${time[0]}-${time[1]}-${time[2]} ${time[3]}:${time[4]}:${time[5]} - ${message}`);
+	const formatted = `[${time[0]}-${time[1]}-${time[2]} ${time[3]}:${time[4]}:${time[5]}]`;
+
+	console.log(`${chalk.cyan(formatted)} ${message}`);
 }
 
 function shutdown(code) {
@@ -62,7 +65,7 @@ function checkCardsInSeconds(seconds, callback) {
 
 function checkCardApps() {
 	if (g_RequestInFlight) {
-		log('Wanted to request a new session, but a request is already in light.');
+		log(chalk.red('Wanted to request a web session, but a request is already in light.'));
 		return;
 	}
 
@@ -124,7 +127,7 @@ client.on('loggedOn', () => {
 });
 
 client.on('error', (e) => {
-	log(`Error: ${e}`);
+	log(chalk.red(`Error: ${e}`));
 
 	if (g_CheckTimer) {
 		clearTimeout(g_CheckTimer);
@@ -132,7 +135,7 @@ client.on('error', (e) => {
 });
 
 client.on('disconnected', (eResult, msg) => {
-	log(`Disconnected: Eresult.${eResult} - ${msg}`);
+	log(chalk.red(`Disconnected: Eresult.${eResult} - ${msg}`));
 
 	if (g_CheckTimer) {
 		clearTimeout(g_CheckTimer);
@@ -144,13 +147,13 @@ client.on('newItems', (count) => {
 		return;
 	}
 
-	log(`Got notification of new inventory items: ${count} new item${count === 1 ? '' : 's'}`);
+	log(chalk.yellowBright(`Got notification of new inventory items: ${count} new item${count === 1 ? '' : 's'}`));
 	checkCardsInSeconds(1);
 });
 
 client.on('webSession', (sessionID, cookies) => {
 	if (g_RequestInFlight) {
-		log('Got a session, but a request is already in flight.');
+		log(chalk.red('Got a web session, but a request is already in flight.'));
 		return;
 	}
 
@@ -179,13 +182,13 @@ client.on('webSession', (sessionID, cookies) => {
 		g_RequestInFlight = false;
 
 		if (err || response.statusCode !== 200) {
-			log(`Couldn't request badge page: ${err || `HTTP error ${response.statusCode}`}`);
+			log(chalk.red(`Couldn't request badge page: ${err || `HTTP error ${response.statusCode}`}`));
 			checkCardsInSeconds(30);
 			return;
 		}
 
 		if (body.includes('g_steamID = false')) {
-			log('Badge page loaded, but its logged out');
+			log(chalk.red('Badge page loaded, but its logged out'));
 			checkCardsInSeconds(30);
 			return;
 		}
@@ -242,25 +245,36 @@ client.on('webSession', (sessionID, cookies) => {
 					minPlaytime = app.playtime;
 				}
 
-				log(`App ${app.appid} - ${app.title} - Playtime: ${app.playtime} min`);
+				log(`App ${app.appid} - ${chalk.green(app.title)} - Playtime: ${chalk.green(app.playtime)} min`);
 			});
 
 			minPlaytime = 120 - minPlaytime;
 
-			log(`Idling ${lowHourApps.length} app${lowHourApps.length === 1 ? '' : 's'} up to 2 hours. This will take ${minPlaytime} minutes.`);
+			log(
+				`Idling ${chalk.green(lowHourApps.length)} app${lowHourApps.length === 1 ? '' : 's'}`
+				+ ` up to 2 hours. This will take ${chalk.green(minPlaytime)} minutes.`,
+			);
 
 			client.gamesPlayed(lowHourApps.map(app => app.appid));
 
 			checkCardsInSeconds(60 * minPlaytime, () => {
-				log('Stopped idling previous apps');
+				log('Stopped idling previous apps.');
 				client.gamesPlayed([]);
 			});
 		} else if (hasDropsApps.length > 0) {
 			const totalDropsLeft = hasDropsApps.reduce((sum, { drops }) => sum + drops, 0);
 			const appToIdle = hasDropsApps[0];
 
-			log(`${totalDropsLeft} card drop${totalDropsLeft === 1 ? '' : 's'} remaining across ${hasDropsApps.length} app${hasDropsApps.length === 1 ? '' : 's'} (Page ${g_Page})`);
-			log(`Idling app ${appToIdle.appid} "${appToIdle.title}" - ${appToIdle.drops} drop${appToIdle.drops === 1 ? '' : 's'} remaining`);
+			log(
+				`${chalk.green(totalDropsLeft)} card drop${totalDropsLeft === 1 ? '' : 's'}`
+				+ ` remaining across ${chalk.green(hasDropsApps.length)} app${hasDropsApps.length === 1 ? '' : 's'}`
+				+ ` ${chalk.cyan(`(page ${g_Page})`)}`,
+			);
+
+			log(
+				`Idling app ${appToIdle.appid} "${chalk.green(appToIdle.title)}" - `
+				+ `${chalk.green(appToIdle.drops)} drop${appToIdle.drops === 1 ? '' : 's'} remaining.`,
+			);
 
 			client.gamesPlayed(appToIdle.appid);
 
@@ -268,12 +282,12 @@ client.on('webSession', (sessionID, cookies) => {
 			// Steam notifies us that we got a new item anyway
 			checkCardsInSeconds(1200);
 		} else if (g_Page <= (parseInt($('.pagelink').last().text(), 10) || 1)) {
-			log(`No drops remaining on page ${g_Page}`);
+			log(chalk.green(`No drops remaining on page ${g_Page}`));
 			g_Page += 1;
-			log(`Checking page ${g_Page}`);
+			log(`Checking page ${g_Page}...`);
 			checkCardsInSeconds(1);
 		} else {
-			log('All card drops received! Shutting down...');
+			log(chalk.green('All card drops received! Shutting down...'));
 			shutdown(0);
 		}
 	});
