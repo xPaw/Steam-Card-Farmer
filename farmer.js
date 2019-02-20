@@ -13,6 +13,7 @@ request = request.defaults({ jar: g_Jar });
 
 let g_Page = 1;
 let g_CheckTimer;
+let g_RequestInFlight = false;
 
 function log(message) {
 	const date = new Date();
@@ -60,6 +61,11 @@ function checkCardsInSeconds(seconds, callback) {
 }
 
 function checkCardApps() {
+	if (g_RequestInFlight) {
+		log('Wanted to request a new session, but a request is already in light.');
+		return;
+	}
+
 	log('Requesting a web session...');
 
 	client.webLogOn();
@@ -143,6 +149,11 @@ client.on('newItems', (count) => {
 });
 
 client.on('webSession', (sessionID, cookies) => {
+	if (g_RequestInFlight) {
+		log('Got a session, but a request is already in flight.');
+		return;
+	}
+
 	log('Got a web session, checking card drops...');
 
 	cookies.forEach((cookie) => {
@@ -163,6 +174,8 @@ client.on('webSession', (sessionID, cookies) => {
 		followRedirect: false,
 		timeout: 10000,
 	}, (err, response, body) => {
+		g_RequestInFlight = false;
+
 		if (err || response.statusCode !== 200) {
 			log(`Couldn't request badge page: ${err || `HTTP error ${response.statusCode}`}`);
 			checkCardsInSeconds(30);
@@ -218,7 +231,7 @@ client.on('webSession', (sessionID, cookies) => {
 			}
 		});
 
-		if (lowHourApps.length > 0) {
+		if (lowHourApps.length > hasDropsApps.length) {
 			let minPlaytime = 120;
 
 			lowHourApps = lowHourApps.slice(0, 32);
