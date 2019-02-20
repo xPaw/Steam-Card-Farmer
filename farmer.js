@@ -154,6 +154,8 @@ client.on('webSession', (sessionID, cookies) => {
 		return;
 	}
 
+	g_RequestInFlight = true;
+
 	log('Got a web session, checking card drops...');
 
 	cookies.forEach((cookie) => {
