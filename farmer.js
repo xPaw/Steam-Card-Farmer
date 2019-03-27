@@ -65,7 +65,7 @@ function checkCardsInSeconds(seconds, callback) {
 
 function checkCardApps() {
 	if (g_RequestInFlight) {
-		log(chalk.red('Wanted to request a web session, but a request is already in light.'));
+		log(chalk.red('Wanted to request a web session, but a request is already in flight.'));
 		return;
 	}
 
