@@ -112,6 +112,8 @@ if (process.argv.length === argsStartIdx + 2) {
 		client.logOn({
 			accountName: result.username,
 			password: result.password,
+			rememberPassword: true,
+			machineName: "Steam-Card-Farmer",
 			logonID: 66666666,
 		});
 	});
