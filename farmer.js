@@ -4,13 +4,11 @@ const SteamUser = require('steam-user');
 const prompt = require('prompt');
 const chalk = require('chalk');
 const Cheerio = require('cheerio');
+const got = require('got');
+const tough = require('tough-cookie');
 
 const client = new SteamUser();
-
-let request = require('request');
-
-const g_Jar = request.jar();
-request = request.defaults({ jar: g_Jar });
+const g_Jar = new tough.CookieJar();
 
 let g_Page = 1;
 let g_CheckTimer;
@@ -84,6 +82,8 @@ if (process.argv.length === argsStartIdx + 2) {
 	client.logOn({
 		accountName: process.argv[argsStartIdx],
 		password: process.argv[argsStartIdx + 1],
+		rememberPassword: true,
+		machineName: 'Steam-Card-Farmer',
 		logonID: 66666666,
 	});
 } else {
@@ -113,7 +113,7 @@ if (process.argv.length === argsStartIdx + 2) {
 			accountName: result.username,
 			password: result.password,
 			rememberPassword: true,
-			machineName: "Steam-Card-Farmer",
+			machineName: 'Steam-Card-Farmer',
 			logonID: 66666666,
 		});
 	});
@@ -153,7 +153,7 @@ client.on('newItems', (count) => {
 	checkCardsInSeconds(1);
 });
 
-client.on('webSession', (sessionID, cookies) => {
+client.on('webSession', async (sessionID, cookies) => {
 	if (g_RequestInFlight) {
 		log(chalk.red('Got a web session, but a request is already in flight.'));
 		return;
@@ -175,122 +175,131 @@ client.on('webSession', (sessionID, cookies) => {
 		url += `profiles/${client.steamID.getSteamID64()}`;
 	}
 
-	request({
-		url: `${url}/badges/?l=english&p=${g_Page}`,
-		gzip: true,
-		followRedirect: false,
-		timeout: 10000,
-	}, (err, response, body) => {
-		g_RequestInFlight = false;
+	let response;
 
-		if (err || response.statusCode !== 200) {
-			log(chalk.red(`Couldn't request badge page: ${err || `HTTP error ${response.statusCode}`}`));
-			checkCardsInSeconds(30);
-			return;
-		}
-
-		if (body.includes('g_steamID = false')) {
-			log(chalk.red('Badge page loaded, but its logged out'));
-			checkCardsInSeconds(30);
-			return;
-		}
-
-		let lowHourApps = [];
-		const hasDropsApps = [];
-
-		const $ = Cheerio.load(body);
-
-		$('.progress_info_bold').each((index, infoline) => {
-			const match = $(infoline).text().match(/(\d+)/);
-			const row = $(infoline).closest('.badge_row');
-			const href = row.find('.badge_title_playgame a').attr('href');
-
-			if (!match || !href) {
-				return;
-			}
-
-			const urlparts = href.split('/');
-			const appid = parseInt(urlparts[urlparts.length - 1], 10) || 0;
-			const drops = parseInt(match[1], 10) || 0;
-
-			if (appid < 1 || drops < 1) {
-				return;
-			}
-
-			let title = row.find('.badge_title');
-			title.find('.badge_view_details').remove();
-			title = title.text().trim();
-
-			let playtime = parseFloat(row.find('.badge_title_stats').html().match(/(\d+\.\d+)/), 10) || 0.0;
-			playtime = Math.round(playtime * 60);
-
-			const appObj = {
-				appid,
-				title,
-				playtime,
-				drops,
-			};
-
-			if (playtime < 120) {
-				lowHourApps.push(appObj);
-			} else {
-				hasDropsApps.push(appObj);
-			}
+	try {
+		response = await got({
+			url: `${url}/badges/?l=english&p=${g_Page}`,
+			followRedirect: false,
+			timeout: 10000,
+			cookieJar: g_Jar,
 		});
+	} catch (err) {
+		log(chalk.red(`Couldn't request badge page: ${err}`));
+		checkCardsInSeconds(30);
+		g_RequestInFlight = false;
+		return;
+	}
 
-		if (lowHourApps.length > hasDropsApps.length) {
-			let minPlaytime = 120;
+	g_RequestInFlight = false;
 
-			lowHourApps = lowHourApps.slice(0, 32);
-			lowHourApps.forEach((app) => {
-				if (app.playtime < minPlaytime) {
-					minPlaytime = app.playtime;
-				}
+	if (response.statusCode !== 200) {
+		log(chalk.red(`Couldn't request badge page: HTTP error ${response.statusCode}`));
+		checkCardsInSeconds(30);
+		return;
+	}
 
-				log(`App ${app.appid} - ${chalk.green(app.title)} - Playtime: ${chalk.green(app.playtime)} min`);
-			});
+	if (response.body.includes('g_steamID = false')) {
+		log(chalk.red('Badge page loaded, but its logged out'));
+		checkCardsInSeconds(30);
+		return;
+	}
 
-			minPlaytime = 120 - minPlaytime;
+	let lowHourApps = [];
+	const hasDropsApps = [];
 
-			log(
-				`Idling ${chalk.green(lowHourApps.length)} app${lowHourApps.length === 1 ? '' : 's'}`
-				+ ` up to 2 hours. This will take ${chalk.green(minPlaytime)} minutes.`,
-			);
+	const $ = Cheerio.load(response.body);
 
-			client.gamesPlayed(lowHourApps.map(app => app.appid));
+	$('.progress_info_bold').each((index, infoline) => {
+		const match = $(infoline).text().match(/(\d+)/);
+		const row = $(infoline).closest('.badge_row');
+		const href = row.find('.badge_title_playgame a').attr('href');
 
-			checkCardsInSeconds(60 * minPlaytime, () => {
-				log('Stopped idling previous apps.');
-				client.gamesPlayed([]);
-			});
-		} else if (hasDropsApps.length > 0) {
-			const totalDropsLeft = hasDropsApps.reduce((sum, { drops }) => sum + drops, 0);
-			const appToIdle = hasDropsApps[0];
+		if (!match || !href) {
+			return;
+		}
 
-			log(
-				`${chalk.green(totalDropsLeft)} card drop${totalDropsLeft === 1 ? '' : 's'}`
-				+ ` remaining across ${chalk.green(hasDropsApps.length)} app${hasDropsApps.length === 1 ? '' : 's'}`
-				+ ` ${chalk.cyan(`(page ${g_Page})`)}`,
-			);
+		const urlparts = href.split('/');
+		const appid = parseInt(urlparts[urlparts.length - 1], 10) || 0;
+		const drops = parseInt(match[1], 10) || 0;
 
-			log(
-				`Idling app ${appToIdle.appid} "${chalk.green(appToIdle.title)}" - `
-				+ `${chalk.green(appToIdle.drops)} drop${appToIdle.drops === 1 ? '' : 's'} remaining.`,
-			);
+		if (appid < 1 || drops < 1) {
+			return;
+		}
 
-			client.gamesPlayed(appToIdle.appid);
+		let title = row.find('.badge_title');
+		title.find('.badge_view_details').remove();
+		title = title.text().trim();
 
-			// 20 minutes to be safe, we should automatically check when
-			// Steam notifies us that we got a new item anyway
-			checkCardsInSeconds(1200);
-		} else if (g_Page <= (parseInt($('.pagelink').last().text(), 10) || 1)) {
-			log(chalk.green(`No drops remaining on page ${g_Page}`));
-			g_Page += 1;
-			log(`Checking page ${g_Page}...`);
-			checkCardsInSeconds(1);
+		let playtime = parseFloat(row.find('.badge_title_stats').html().match(/(\d+\.\d+)/), 10) || 0.0;
+		playtime = Math.round(playtime * 60);
+
+		const appObj = {
+			appid,
+			title,
+			playtime,
+			drops,
+		};
+
+		if (playtime < 120) {
+			lowHourApps.push(appObj);
 		} else {
-			log(chalk.green('All card drops received! Shutting down...'));
-			shutdown(0);
+			hasDropsApps.push(appObj);
 		}
 	});
+
+	if (lowHourApps.length > hasDropsApps.length) {
+		let minPlaytime = 120;
+
+		lowHourApps = lowHourApps.slice(0, 32);
+		lowHourApps.forEach((app) => {
+			if (app.playtime < minPlaytime) {
+				minPlaytime = app.playtime;
+			}
+
+			log(`App ${app.appid} - ${chalk.green(app.title)} - Playtime: ${chalk.green(app.playtime)} min`);
+		});
+
+		minPlaytime = 120 - minPlaytime;
+
+		log(
+			`Idling ${chalk.green(lowHourApps.length)} app${lowHourApps.length === 1 ? '' : 's'}`
+				+ ` up to 2 hours. This will take ${chalk.green(minPlaytime)} minutes.`,
+		);
+
+		client.gamesPlayed(lowHourApps.map((app) => app.appid));
+
+		checkCardsInSeconds(60 * minPlaytime, () => {
+			log('Stopped idling previous apps.');
+			client.gamesPlayed([]);
+		});
+	} else if (hasDropsApps.length > 0) {
+		const totalDropsLeft = hasDropsApps.reduce((sum, { drops }) => sum + drops, 0);
+		const appToIdle = hasDropsApps[0];
+
+		log(
+			`${chalk.green(totalDropsLeft)} card drop${totalDropsLeft === 1 ? '' : 's'}`
+				+ ` remaining across ${chalk.green(hasDropsApps.length)} app${hasDropsApps.length === 1 ? '' : 's'}`
+				+ ` ${chalk.cyan(`(page ${g_Page})`)}`,
+		);
+
+		log(
+			`Idling app ${appToIdle.appid} "${chalk.green(appToIdle.title)}" - `
+				+ `${chalk.green(appToIdle.drops)} drop${appToIdle.drops === 1 ? '' : 's'} remaining.`,
+		);
+
+		client.gamesPlayed(appToIdle.appid);
+
+		// 20 minutes to be safe, we should automatically check when
+		// Steam notifies us that we got a new item anyway
+		checkCardsInSeconds(1200);
+	} else if (g_Page <= (parseInt($('.pagelink').last().text(), 10) || 1)) {
+		log(chalk.green(`No drops remaining on page ${g_Page}`));
+		g_Page += 1;
+		log(`Checking page ${g_Page}...`);
+		checkCardsInSeconds(1);
+	} else {
+		log(chalk.green('All card drops received! Shutting down...'));
+		shutdown(0);
+	}
 });

@@ -16,11 +16,12 @@
 		"url": "https://github.com/DoctorMcKay/Steam-Card-Farmer"
 	},
 	"dependencies": {
-		"chalk": "^3.0.0",
+		"chalk": "^4.0.0",
 		"cheerio": "1.0.0-rc.3",
+		"got": "^11.1.4",
 		"prompt": "^1.0.0",
-		"request": "^2.88.0",
-		"steam-user": "^4.0.0"
+		"steam-user": "^4.0.0",
+		"tough-cookie": "^4.0.0"
 	},
 	"devDependencies": {
 		"eslint": "^6.8.0",
