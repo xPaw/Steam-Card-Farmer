@@ -14,111 +14,6 @@ let g_Page = 1;
 let g_CheckTimer;
 let g_RequestInFlight = false;
 
-function log(message) {
-	const date = new Date();
-	const time = [
-		date.getFullYear(),
-		date.getMonth() + 1,
-		date.getDate(),
-		date.getHours(),
-		date.getMinutes(),
-		date.getSeconds(),
-	];
-
-	for (let i = 1; i < 6; i += 1) {
-		if (time[i] < 10) {
-			time[i] = `0${time[i]}`;
-		}
-	}
-
-	const formatted = `[${time[0]}-${time[1]}-${time[2]} ${time[3]}:${time[4]}:${time[5]}]`;
-
-	console.log(`${chalk.cyan(formatted)} ${message}`);
-}
-
-function shutdown(code) {
-	client.logOff();
-	client.once('disconnected', () => {
-		process.exit(code);
-	});
-
-	setTimeout(() => {
-		process.exit(code);
-	}, 500);
-}
-
-function checkCardsInSeconds(seconds, callback) {
-	if (g_CheckTimer) {
-		clearTimeout(g_CheckTimer);
-	}
-
-	g_CheckTimer = setTimeout(() => {
-		if (callback) {
-			callback();
-		}
-
-		checkCardApps();
-	}, 1000 * seconds);
-}
-
-function checkCardApps() {
-	if (g_RequestInFlight) {
-		log(chalk.red('Wanted to request a web session, but a request is already in flight.'));
-		return;
-	}
-
-	log('Requesting a web session...');
-
-	client.webLogOn();
-}
-
-let argsStartIdx = 2;
-if (process.argv[0] === 'steamcardfarmer') {
-	argsStartIdx = 1;
-}
-
-if (process.argv.length === argsStartIdx + 2) {
-	log('Reading Steam credentials from command line');
-	client.logOn({
-		accountName: process.argv[argsStartIdx],
-		password: process.argv[argsStartIdx + 1],
-		rememberPassword: true,
-		machineName: 'Steam-Card-Farmer',
-		logonID: 66666666,
-	});
-} else {
-	prompt.start();
-	prompt.get({
-		properties: {
-			username: {
-				type: 'string',
-				required: true,
-			},
-			password: {
-				type: 'string',
-				hidden: true,
-				replace: '*',
-				required: true,
-			},
-		},
-	}, (err, result) => {
-		if (err) {
-			log(`Error: ${err}`);
-			shutdown(1);
-			return;
-		}
-
-		log('Initializing Steam client...');
-		client.logOn({
-			accountName: result.username,
-			password: result.password,
-			rememberPassword: true,
-			machineName: 'Steam-Card-Farmer',
-			logonID: 66666666,
-		});
-	});
-}
-
 process.on('SIGINT', () => {
 	log('Logging off and shutting down...');
 	shutdown(0);
@@ -303,3 +198,112 @@ client.on('webSession', async (sessionID, cookies) => {
 		shutdown(0);
 	}
 });
+
+performLogon();
+
+function performLogon() {
+	const opts = {
+		rememberPassword: true,
+		machineName: 'Steam-Card-Farmer',
+		logonID: 66666666,
+		protocol: SteamUser.EConnectionProtocol.TCP,
+	};
+
+	let argsStartIdx = 2;
+	if (process.argv[0] === 'steamcardfarmer') {
+		argsStartIdx = 1;
+	}
+
+	if (process.argv.length === argsStartIdx + 2) {
+		opts.accountName = process.argv[argsStartIdx];
+		opts.password = process.argv[argsStartIdx + 1];
+		client.logOn(opts);
+		delete opts;
+	} else {
+		prompt.start();
+		prompt.get({
+			properties: {
+				username: {
+					type: 'string',
+					required: true,
+				},
+				password: {
+					type: 'string',
+					hidden: true,
+					replace: '*',
+					required: true,
+				},
+			},
+		}, (err, result) => {
+			if (err) {
+				log(`Error: ${err}`);
+				shutdown(1);
+				return;
+			}
+
+			opts.accountName = result.username;
+			opts.password = result.password;
+			client.logOn(opts);
+			delete opts;
+			delete client;
+		});
+	}
+}
+
+function checkCardsInSeconds(seconds, callback) {
+	if (g_CheckTimer) {
+		clearTimeout(g_CheckTimer);
+	}
+
+	g_CheckTimer = setTimeout(() => {
+		if (callback) {
+			callback();
+		}
+
+		checkCardApps();
+	}, 1000 * seconds);
+}
+
+function checkCardApps() {
+	if (g_RequestInFlight) {
+		log(chalk.red('Wanted to request a web session, but a request is already in flight.'));
+		return;
+	}
+
+	log('Requesting a web session...');
+
+	client.webLogOn();
+}
+
+function shutdown(code) {
+	client.logOff();
+	client.once('disconnected', () => {
+		process.exit(code);
+	});
+
+	setTimeout(() => {
+		process.exit(code);
+	}, 500);
+}
+
+function log(message) {
+	const date = new Date();
+	const time = [
+		date.getFullYear(),
+		date.getMonth() + 1,
+		date.getDate(),
+		date.getHours(),
+		date.getMinutes(),
+		date.getSeconds(),
+	];
+
+	for (let i = 1; i < 6; i += 1) {
+		if (time[i] < 10) {
+			time[i] = `0${time[i]}`;
+		}
+	}
+
+	const formatted = `[${time[0]}-${time[1]}-${time[2]} ${time[3]}:${time[4]}:${time[5]}]`;
+
+	console.log(`${chalk.cyan(formatted)} ${message}`);
+}
