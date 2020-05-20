@@ -7,7 +7,9 @@ const Cheerio = require('cheerio');
 const got = require('got');
 const tough = require('tough-cookie');
 
-const client = new SteamUser();
+const client = new SteamUser({
+	protocol: SteamUser.EConnectionProtocol.TCP,
+});
 const g_Jar = new tough.CookieJar();
 
 let g_Page = 1;
@@ -206,7 +208,6 @@ function performLogon() {
 		rememberPassword: true,
 		machineName: 'Steam-Card-Farmer',
 		logonID: 66666666,
-		protocol: SteamUser.EConnectionProtocol.TCP,
 	};
 
 	let argsStartIdx = 2;
