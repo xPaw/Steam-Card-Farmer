@@ -218,7 +218,6 @@ function performLogon() {
 		opts.accountName = process.argv[argsStartIdx];
 		opts.password = process.argv[argsStartIdx + 1];
 		client.logOn(opts);
-		delete opts;
 	} else {
 		prompt.start();
 		prompt.get({
@@ -244,8 +243,6 @@ function performLogon() {
 			opts.accountName = result.username;
 			opts.password = result.password;
 			client.logOn(opts);
-			delete opts;
-			delete client;
 		});
 	}
 }
