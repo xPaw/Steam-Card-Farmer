@@ -11,6 +11,7 @@ const client = new SteamUser({
 	protocol: SteamUser.EConnectionProtocol.TCP,
 });
 const g_Jar = new tough.CookieJar();
+g_Jar.setCookie('Steam_Language=english', 'https://steamcommunity.com');
 
 let g_Page = 1;
 let g_CheckTimer;
