@@ -281,6 +281,8 @@ class SteamCardFarmer {
 		const date = new Date();
 		const isoDateTime = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
 		const formatted = `[${isoDateTime.toISOString().split('.')[0].replace('T', ' ')}]`;
+
+		// eslint-disable-next-line no-console
 		console.log(`${chalk.cyan(formatted)} ${message}`);
 	}
 }

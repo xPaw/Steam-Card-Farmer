@@ -4,7 +4,5 @@ env:
   node: true
 
 rules:
-  camelcase: off
   indent: [error, tab]
-  no-console: off
   no-tabs: off
