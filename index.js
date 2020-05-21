@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-const SteamUser = require('steam-user');
-const prompt = require('prompt');
 const chalk = require('chalk');
-const Cheerio = require('cheerio');
+const cheerio = require('cheerio');
 const got = require('got');
+const prompt = require('prompt');
+const SteamUser = require('steam-user');
 const tough = require('tough-cookie');
 
 class SteamCardFarmer {
@@ -144,7 +144,7 @@ class SteamCardFarmer {
 		let lowHourApps = [];
 		const hasDropsApps = [];
 
-		const $ = Cheerio.load(response.body);
+		const $ = cheerio.load(response.body);
 
 		$('.progress_info_bold').each((index, infoline) => {
 			const match = $(infoline).text().match(/(\d+)/);
