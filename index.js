@@ -277,23 +277,8 @@ class SteamCardFarmer {
 	// eslint-disable-next-line class-methods-use-this
 	log(message) {
 		const date = new Date();
-		const time = [
-			date.getFullYear(),
-			date.getMonth() + 1,
-			date.getDate(),
-			date.getHours(),
-			date.getMinutes(),
-			date.getSeconds(),
-		];
-
-		for (let i = 1; i < 6; i += 1) {
-			if (time[i] < 10) {
-				time[i] = `0${time[i]}`;
-			}
-		}
-
-		const formatted = `[${time[0]}-${time[1]}-${time[2]} ${time[3]}:${time[4]}:${time[5]}]`;
-
+		const isoDateTime = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+		const formatted = `[${isoDateTime.toISOString().split('.')[0].replace('T', ' ')}]`;
 		console.log(`${chalk.cyan(formatted)} ${message}`);
 	}
 }
