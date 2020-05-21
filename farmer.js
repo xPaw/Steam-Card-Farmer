@@ -58,7 +58,6 @@ client.on('playingState', (blocked, playingApp) => {
 	if (blocked) {
 		log(chalk.yellowBright(`App ${playingApp} was launched on another client, no longer idling.`));
 		clearTimeout(g_CheckTimer);
-		client.gamesPlayed([]);
 	} else {
 		log(chalk.yellowBright('Play state is no longer blocked.'));
 		checkCardsInSeconds(1);
