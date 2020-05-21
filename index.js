@@ -45,7 +45,7 @@ class SteamCardFarmer {
 		if (e.eresult === SteamUser.EResult.LoggedInElsewhere) {
 			this.playStateBlocked = true;
 
-			this.log(chalk.red('Another client logged in elsewhere, re-logging in...'));
+			this.log(chalk.red('Another client logged in elsewhere, relogging in...'));
 
 			setTimeout(() => this.client.logOn(true), 1000);
 
@@ -273,7 +273,7 @@ class SteamCardFarmer {
 				{
 					type: 'input',
 					name: 'code',
-					message: domain ? `Steam Guard Code (${domain}):` : 'Steam App Code',
+					message: domain ? `Steam Guard Code (${domain}):` : 'Steam App Code:',
 					validate: (input) => input.length === 5,
 				},
 			])
