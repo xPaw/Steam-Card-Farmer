@@ -8,4 +8,3 @@ rules:
   indent: [error, tab]
   no-console: off
   no-tabs: off
-  no-use-before-define: off

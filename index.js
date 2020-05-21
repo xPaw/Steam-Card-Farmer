@@ -7,236 +7,304 @@ const Cheerio = require('cheerio');
 const got = require('got');
 const tough = require('tough-cookie');
 
-const client = new SteamUser({
-	protocol: SteamUser.EConnectionProtocol.TCP,
-});
-const g_Jar = new tough.CookieJar();
-g_Jar.setCookie('Steam_Language=english', 'https://steamcommunity.com');
-
-let g_Page = 1;
-let g_CheckTimer;
-let g_RequestInFlight = false;
-let g_PlayStateBlocked = false;
-
-process.on('SIGINT', () => {
-	log('Logging off and shutting down...');
-	shutdown(0);
-});
-
-client.on('loggedOn', () => {
-	log('Logged into Steam!');
-});
-
-client.on('error', (e) => {
-	clearTimeout(g_CheckTimer);
-
-	if (e.eresult === SteamUser.EResult.LoggedInElsewhere) {
-		g_PlayStateBlocked = true;
-
-		log(chalk.red('Another client logged in elsewhere, re-logging in...'));
-
-		setTimeout(() => client.logOn(true), 1000);
-
-		return;
-	}
-
-	log(chalk.red(`Error: ${e}`));
-});
-
-client.on('disconnected', (eResult, msg) => {
-	log(chalk.red(`Disconnected: Eresult.${eResult} - ${msg}`));
-	clearTimeout(g_CheckTimer);
-});
-
-client.on('playingState', (blocked, playingApp) => {
-	if (g_PlayStateBlocked === blocked) {
-		return;
-	}
-
-	g_PlayStateBlocked = blocked;
-
-	if (blocked) {
-		log(chalk.yellowBright(`App ${playingApp} was launched on another client, no longer idling.`));
-		clearTimeout(g_CheckTimer);
-	} else {
-		log(chalk.yellowBright('Play state is no longer blocked.'));
-		checkCardsInSeconds(1);
-	}
-});
-
-client.on('newItems', (count) => {
-	if (count === 0) {
-		return;
-	}
-
-	log(chalk.yellowBright(`Got notification of new inventory items: ${count} new item${count === 1 ? '' : 's'}`));
-	checkCardsInSeconds(1);
-});
-
-client.on('webSession', async (sessionID, cookies) => {
-	if (g_PlayStateBlocked) {
-		log(chalk.red('Got a web session, but play state is blocked.'));
-		return;
-	}
-
-	if (g_RequestInFlight) {
-		log(chalk.red('Got a web session, but a request is already in flight.'));
-		return;
-	}
-
-	g_RequestInFlight = true;
-
-	log('Got a web session, checking card drops...');
-
-	cookies.forEach((cookie) => {
-		g_Jar.setCookie(cookie, 'https://steamcommunity.com');
-	});
-
-	let url = 'https://steamcommunity.com/';
-
-	if (client.vanityURL) {
-		url += `id/${client.vanityURL}`;
-	} else {
-		url += `profiles/${client.steamID.getSteamID64()}`;
-	}
-
-	let response;
-
-	try {
-		response = await got({
-			url: `${url}/badges/?l=english&p=${g_Page}`,
-			followRedirect: false,
-			timeout: 10000,
-			cookieJar: g_Jar,
+class SteamCardFarmer {
+	constructor() {
+		this.client = new SteamUser({
+			protocol: SteamUser.EConnectionProtocol.TCP,
 		});
-	} catch (err) {
-		log(chalk.red(`Couldn't request badge page: ${err}`));
-		checkCardsInSeconds(30);
-		g_RequestInFlight = false;
-		return;
+
+		this.cookieJar = new tough.CookieJar();
+		this.cookieJar.setCookie('Steam_Language=english', 'https://steamcommunity.com');
+
+		this.page = 1;
+		this.checkTimer = null;
+		this.requestInFlight = false;
+		this.playStateBlocked = false;
 	}
 
-	g_RequestInFlight = false;
+	logOn(username, password) {
+		this.client.logOn({
+			accountName: username,
+			password,
+			rememberPassword: true,
+			machineName: 'Steam-Card-Farmer',
+			logonID: 66666666,
+		});
 
-	if (response.statusCode !== 200) {
-		log(chalk.red(`Couldn't request badge page: HTTP error ${response.statusCode}`));
-		checkCardsInSeconds(30);
-		return;
-	}
+		this.client.on('loggedOn', () => {
+			this.log('Logged into Steam!');
+		});
 
-	if (response.body.includes('g_steamID = false')) {
-		log(chalk.red('Badge page loaded, but its logged out'));
-		checkCardsInSeconds(30);
-		return;
-	}
+		this.client.on('error', (e) => {
+			clearTimeout(this.checkTimer);
 
-	let lowHourApps = [];
-	const hasDropsApps = [];
+			if (e.eresult === SteamUser.EResult.LoggedInElsewhere) {
+				this.playStateBlocked = true;
 
-	const $ = Cheerio.load(response.body);
+				this.log(chalk.red('Another client logged in elsewhere, re-logging in...'));
 
-	$('.progress_info_bold').each((index, infoline) => {
-		const match = $(infoline).text().match(/(\d+)/);
-		const row = $(infoline).closest('.badge_row');
-		const href = row.find('.badge_title_playgame a').attr('href');
+				setTimeout(() => this.client.logOn(true), 1000);
 
-		if (!match || !href) {
-			return;
-		}
-
-		const urlparts = href.split('/');
-		const appid = parseInt(urlparts[urlparts.length - 1], 10) || 0;
-		const drops = parseInt(match[1], 10) || 0;
-
-		if (appid < 1 || drops < 1) {
-			return;
-		}
-
-		let title = row.find('.badge_title');
-		title.find('.badge_view_details').remove();
-		title = title.text().trim();
-
-		let playtime = parseFloat(row.find('.badge_title_stats').html().match(/(\d+\.\d+)/), 10) || 0.0;
-		playtime = Math.round(playtime * 60);
-
-		const appObj = {
-			appid,
-			title,
-			playtime,
-			drops,
-		};
-
-		if (playtime < 120) {
-			lowHourApps.push(appObj);
-		} else {
-			hasDropsApps.push(appObj);
-		}
-	});
-
-	if (lowHourApps.length > hasDropsApps.length) {
-		let minPlaytime = 120;
-
-		lowHourApps = lowHourApps.slice(0, 32);
-		lowHourApps.forEach((app) => {
-			if (app.playtime < minPlaytime) {
-				minPlaytime = app.playtime;
+				return;
 			}
 
-			log(`App ${app.appid} - ${chalk.green(app.title)} - Playtime: ${chalk.green(app.playtime)} min`);
+			this.log(chalk.red(`Error: ${e}`));
 		});
 
-		minPlaytime = 120 - minPlaytime;
+		this.client.on('disconnected', (eResult, msg) => {
+			this.log(chalk.red(`Disconnected: Eresult.${eResult} - ${msg}`));
+			clearTimeout(this.checkTimer);
+		});
 
-		log(
-			`Idling ${chalk.green(lowHourApps.length)} app${lowHourApps.length === 1 ? '' : 's'}`
+		this.client.on('playingState', (blocked, playingApp) => {
+			if (this.playStateBlocked === blocked) {
+				return;
+			}
+
+			this.playStateBlocked = blocked;
+
+			if (blocked) {
+				this.log(chalk.yellowBright(`App ${playingApp} was launched on another client, no longer idling.`));
+				clearTimeout(this.checkTimer);
+			} else {
+				this.log(chalk.yellowBright('Play state is no longer blocked.'));
+				this.checkCardsInSeconds(1);
+			}
+		});
+
+		this.client.on('newItems', (count) => {
+			if (count === 0) {
+				return;
+			}
+
+			this.log(chalk.yellowBright(`Got notification of new inventory items: ${count} new item${count === 1 ? '' : 's'}`));
+			this.checkCardsInSeconds(1);
+		});
+
+		this.client.on('webSession', async (sessionID, cookies) => {
+			if (this.playStateBlocked) {
+				this.log(chalk.red('Got a web session, but play state is blocked.'));
+				return;
+			}
+
+			if (this.requestInFlight) {
+				this.log(chalk.red('Got a web session, but a request is already in flight.'));
+				return;
+			}
+
+			this.requestInFlight = true;
+
+			this.log('Got a web session, checking card drops...');
+
+			cookies.forEach((cookie) => {
+				this.cookieJar.setCookie(cookie, 'https://steamcommunity.com');
+			});
+
+			let url = '';
+
+			if (this.client.vanityURL) {
+				url = `id/${this.client.vanityURL}`;
+			} else {
+				url = `profiles/${this.client.steamID.getSteamID64()}`;
+			}
+
+			let response;
+
+			try {
+				response = await got({
+					url: `https://steamcommunity.com/${url}/badges/?l=english&p=${this.page}`,
+					followRedirect: false,
+					timeout: 10000,
+					cookieJar: this.cookieJar,
+				});
+			} catch (err) {
+				this.log(chalk.red(`Couldn't request badge page: ${err}`));
+				this.checkCardsInSeconds(30);
+				this.requestInFlight = false;
+				return;
+			}
+
+			this.requestInFlight = false;
+
+			if (response.statusCode !== 200) {
+				this.log(chalk.red(`Couldn't request badge page: HTTP error ${response.statusCode}`));
+				this.checkCardsInSeconds(30);
+				return;
+			}
+
+			if (response.body.includes('g_steamID = false')) {
+				this.log(chalk.red('Badge page loaded, but its logged out'));
+				this.checkCardsInSeconds(30);
+				return;
+			}
+
+			let lowHourApps = [];
+			const hasDropsApps = [];
+
+			const $ = Cheerio.load(response.body);
+
+			$('.progress_info_bold').each((index, infoline) => {
+				const match = $(infoline).text().match(/(\d+)/);
+				const row = $(infoline).closest('.badge_row');
+				const href = row.find('.badge_title_playgame a').attr('href');
+
+				if (!match || !href) {
+					return;
+				}
+
+				const urlparts = href.split('/');
+				const appid = parseInt(urlparts[urlparts.length - 1], 10) || 0;
+				const drops = parseInt(match[1], 10) || 0;
+
+				if (appid < 1 || drops < 1) {
+					return;
+				}
+
+				let title = row.find('.badge_title');
+				title.find('.badge_view_details').remove();
+				title = title.text().trim();
+
+				let playtime = parseFloat(row.find('.badge_title_stats').html().match(/(\d+\.\d+)/), 10) || 0.0;
+				playtime = Math.round(playtime * 60);
+
+				const appObj = {
+					appid,
+					title,
+					playtime,
+					drops,
+				};
+
+				if (playtime < 120) {
+					lowHourApps.push(appObj);
+				} else {
+					hasDropsApps.push(appObj);
+				}
+			});
+
+			if (lowHourApps.length > hasDropsApps.length) {
+				let minPlaytime = 120;
+
+				lowHourApps = lowHourApps.slice(0, 32);
+				lowHourApps.forEach((app) => {
+					if (app.playtime < minPlaytime) {
+						minPlaytime = app.playtime;
+					}
+
+					this.log(`App ${app.appid} - ${chalk.green(app.title)} - Playtime: ${chalk.green(app.playtime)} min`);
+				});
+
+				minPlaytime = 120 - minPlaytime;
+
+				this.log(
+					`Idling ${chalk.green(lowHourApps.length)} app${lowHourApps.length === 1 ? '' : 's'}`
 				+ ` up to 2 hours. This will take ${chalk.green(minPlaytime)} minutes.`,
-		);
+				);
 
-		client.gamesPlayed(lowHourApps.map((app) => app.appid));
+				this.client.gamesPlayed(lowHourApps.map((app) => app.appid));
 
-		checkCardsInSeconds(60 * minPlaytime, () => {
-			log('Stopped idling previous apps.');
-			client.gamesPlayed([]);
-		});
-	} else if (hasDropsApps.length > 0) {
-		const totalDropsLeft = hasDropsApps.reduce((sum, { drops }) => sum + drops, 0);
-		const appToIdle = hasDropsApps[0];
+				this.checkCardsInSeconds(60 * minPlaytime, () => {
+					this.log('Stopped idling previous apps.');
+					this.client.gamesPlayed([]);
+				});
+			} else if (hasDropsApps.length > 0) {
+				const totalDropsLeft = hasDropsApps.reduce((sum, { drops }) => sum + drops, 0);
+				const appToIdle = hasDropsApps[0];
 
-		log(
-			`${chalk.green(totalDropsLeft)} card drop${totalDropsLeft === 1 ? '' : 's'}`
+				this.log(
+					`${chalk.green(totalDropsLeft)} card drop${totalDropsLeft === 1 ? '' : 's'}`
 				+ ` remaining across ${chalk.green(hasDropsApps.length)} app${hasDropsApps.length === 1 ? '' : 's'}`
-				+ ` ${chalk.cyan(`(page ${g_Page})`)}`,
-		);
+				+ ` ${chalk.cyan(`(page ${this.page})`)}`,
+				);
 
-		log(
-			`Idling app ${appToIdle.appid} "${chalk.green(appToIdle.title)}" - `
+				this.log(
+					`Idling app ${appToIdle.appid} "${chalk.green(appToIdle.title)}" - `
 				+ `${chalk.green(appToIdle.drops)} drop${appToIdle.drops === 1 ? '' : 's'} remaining.`,
-		);
+				);
 
-		client.gamesPlayed(appToIdle.appid);
+				this.client.gamesPlayed(appToIdle.appid);
 
-		// 20 minutes to be safe, we should automatically check when
-		// Steam notifies us that we got a new item anyway
-		checkCardsInSeconds(1200);
-	} else if (g_Page <= (parseInt($('.pagelink').last().text(), 10) || 1)) {
-		log(chalk.green(`No drops remaining on page ${g_Page}`));
-		g_Page += 1;
-		log(`Checking page ${g_Page}...`);
-		checkCardsInSeconds(1);
-	} else {
-		log(chalk.green('All card drops received! Shutting down...'));
-		shutdown(0);
+				// 20 minutes to be safe, we should automatically check when
+				// Steam notifies us that we got a new item anyway
+				this.checkCardsInSeconds(1200);
+			} else if (this.page <= (parseInt($('.pagelink').last().text(), 10) || 1)) {
+				this.log(chalk.green(`No drops remaining on page ${this.page}`));
+				this.page += 1;
+				this.log(`Checking page ${this.page}...`);
+				this.checkCardsInSeconds(1);
+			} else {
+				this.log(chalk.green('All card drops received! Shutting down...'));
+				this.shutdown(0);
+			}
+		});
 	}
-});
 
-performLogon();
+	checkCardsInSeconds(seconds, callback) {
+		if (this.checkTimer) {
+			clearTimeout(this.checkTimer);
+		}
+
+		this.checkTimer = setTimeout(() => {
+			if (callback) {
+				callback();
+			}
+
+			this.checkCardApps();
+		}, 1000 * seconds);
+	}
+
+	checkCardApps() {
+		if (this.requestInFlight) {
+			this.log(chalk.red('Wanted to request a web session, but a request is already in flight.'));
+			return;
+		}
+
+		this.log('Requesting a web session...');
+
+		this.client.webLogOn();
+	}
+
+	shutdown(code) {
+		this.client.logOff();
+		this.client.once('disconnected', () => {
+			process.exit(code);
+		});
+
+		setTimeout(() => {
+			process.exit(code);
+		}, 500);
+	}
+
+	// eslint-disable-next-line class-methods-use-this
+	log(message) {
+		const date = new Date();
+		const time = [
+			date.getFullYear(),
+			date.getMonth() + 1,
+			date.getDate(),
+			date.getHours(),
+			date.getMinutes(),
+			date.getSeconds(),
+		];
+
+		for (let i = 1; i < 6; i += 1) {
+			if (time[i] < 10) {
+				time[i] = `0${time[i]}`;
+			}
+		}
+
+		const formatted = `[${time[0]}-${time[1]}-${time[2]} ${time[3]}:${time[4]}:${time[5]}]`;
+
+		console.log(`${chalk.cyan(formatted)} ${message}`);
+	}
+}
 
 function performLogon() {
-	const opts = {
-		rememberPassword: true,
-		machineName: 'Steam-Card-Farmer',
-		logonID: 66666666,
-	};
+	const farmer = new SteamCardFarmer();
+
+	process.on('SIGINT', () => {
+		farmer.log('Logging off and shutting down...');
+		farmer.shutdown(0);
+	});
 
 	let argsStartIdx = 2;
 	if (process.argv[0] === 'steamcardfarmer') {
@@ -244,9 +312,7 @@ function performLogon() {
 	}
 
 	if (process.argv.length === argsStartIdx + 2) {
-		opts.accountName = process.argv[argsStartIdx];
-		opts.password = process.argv[argsStartIdx + 1];
-		client.logOn(opts);
+		farmer(process.argv[argsStartIdx], process.argv[argsStartIdx + 1]);
 	} else {
 		prompt.start();
 		prompt.get({
@@ -264,72 +330,14 @@ function performLogon() {
 			},
 		}, (err, result) => {
 			if (err) {
-				log(`Error: ${err}`);
-				shutdown(1);
+				farmer.log(`Error: ${err}`);
+				farmer.shutdown(1);
 				return;
 			}
 
-			opts.accountName = result.username;
-			opts.password = result.password;
-			client.logOn(opts);
+			farmer.logOn(result.username, result.password);
 		});
 	}
 }
 
-function checkCardsInSeconds(seconds, callback) {
-	if (g_CheckTimer) {
-		clearTimeout(g_CheckTimer);
-	}
-
-	g_CheckTimer = setTimeout(() => {
-		if (callback) {
-			callback();
-		}
-
-		checkCardApps();
-	}, 1000 * seconds);
-}
-
-function checkCardApps() {
-	if (g_RequestInFlight) {
-		log(chalk.red('Wanted to request a web session, but a request is already in flight.'));
-		return;
-	}
-
-	log('Requesting a web session...');
-
-	client.webLogOn();
-}
-
-function shutdown(code) {
-	client.logOff();
-	client.once('disconnected', () => {
-		process.exit(code);
-	});
-
-	setTimeout(() => {
-		process.exit(code);
-	}, 500);
-}
-
-function log(message) {
-	const date = new Date();
-	const time = [
-		date.getFullYear(),
-		date.getMonth() + 1,
-		date.getDate(),
-		date.getHours(),
-		date.getMinutes(),
-		date.getSeconds(),
-	];
-
-	for (let i = 1; i < 6; i += 1) {
-		if (time[i] < 10) {
-			time[i] = `0${time[i]}`;
-		}
-	}
-
-	const formatted = `[${time[0]}-${time[1]}-${time[2]} ${time[3]}:${time[4]}:${time[5]}]`;
-
-	console.log(`${chalk.cyan(formatted)} ${message}`);
-}
+performLogon();
