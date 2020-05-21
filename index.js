@@ -246,6 +246,11 @@ class SteamCardFarmer {
 			clearTimeout(this.checkTimer);
 		}
 
+		if (this.playStateBlocked) {
+			this.log(chalk.red('Wanted to check cards, but play state is blocked.'));
+			return;
+		}
+
 		this.checkTimer = setTimeout(() => {
 			if (callback) {
 				callback();
