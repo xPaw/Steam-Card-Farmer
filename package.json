@@ -1,14 +1,14 @@
 {
 	"name": "steam-card-farmer",
 	"description": "Automatically farms card drops for Steam games you own with remaining drops",
-	"version": "2.0.2",
+	"version": "3.0.0",
 	"license": "MIT",
-	"main": "farmer.js",
+	"main": "index.js",
 	"bin": {
-		"steamcardfarmer": "./farmer.js"
+		"steamcardfarmer": "./index.js"
 	},
 	"scripts": {
-		"start": "node farmer.js",
+		"start": "node index.js",
 		"test": "eslint ."
 	},
 	"repository": {
