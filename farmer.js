@@ -16,6 +16,7 @@ g_Jar.setCookie('Steam_Language=english', 'https://steamcommunity.com');
 let g_Page = 1;
 let g_CheckTimer;
 let g_RequestInFlight = false;
+let g_PlayStateBlocked = false;
 
 process.on('SIGINT', () => {
 	log('Logging off and shutting down...');
@@ -27,18 +28,40 @@ client.on('loggedOn', () => {
 });
 
 client.on('error', (e) => {
-	log(chalk.red(`Error: ${e}`));
+	clearTimeout(g_CheckTimer);
 
-	if (g_CheckTimer) {
-		clearTimeout(g_CheckTimer);
+	if (e.eresult === SteamUser.EResult.LoggedInElsewhere) {
+		g_PlayStateBlocked = true;
+
+		log(chalk.red('Another client logged in elsewhere, re-logging in...'));
+
+		setTimeout(() => client.logOn(true), 1000);
+
+		return;
 	}
+
+	log(chalk.red(`Error: ${e}`));
 });
 
 client.on('disconnected', (eResult, msg) => {
 	log(chalk.red(`Disconnected: Eresult.${eResult} - ${msg}`));
+	clearTimeout(g_CheckTimer);
+});
 
-	if (g_CheckTimer) {
+client.on('playingState', (blocked, playingApp) => {
+	if (g_PlayStateBlocked === blocked) {
+		return;
+	}
+
+	g_PlayStateBlocked = blocked;
+
+	if (blocked) {
+		log(chalk.yellowBright(`App ${playingApp} was launched on another client, no longer idling.`));
 		clearTimeout(g_CheckTimer);
+		client.gamesPlayed([]);
+	} else {
+		log(chalk.yellowBright('Play state is no longer blocked.'));
+		checkCardsInSeconds(1);
 	}
 });
 
@@ -52,6 +75,11 @@ client.on('newItems', (count) => {
 });
 
 client.on('webSession', async (sessionID, cookies) => {
+	if (g_PlayStateBlocked) {
+		log(chalk.red('Got a web session, but play state is blocked.'));
+		return;
+	}
+
 	if (g_RequestInFlight) {
 		log(chalk.red('Got a web session, but a request is already in flight.'));
 		return;
