@@ -19,7 +19,7 @@
 		"chalk": "^4.0.0",
 		"cheerio": "1.0.0-rc.3",
 		"got": "^11.1.4",
-		"prompt": "^1.0.0",
+		"inquirer": "^7.1.0",
 		"steam-user": "^4.0.0",
 		"tough-cookie": "^4.0.0"
 	},

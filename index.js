@@ -3,7 +3,7 @@
 const chalk = require('chalk');
 const cheerio = require('cheerio');
 const got = require('got');
-const prompt = require('prompt');
+const inquirer = require('inquirer');
 const SteamUser = require('steam-user');
 const tough = require('tough-cookie');
 
@@ -26,6 +26,7 @@ class SteamCardFarmer {
 		this.client.on('playingState', this.onPlayingState.bind(this));
 		this.client.on('newItems', this.onNewItems.bind(this));
 		this.client.on('webSession', this.onWebSession.bind(this));
+		this.client.on('steamGuard', this.onSteamGuard.bind(this));
 	}
 
 	logOn(username, password) {
@@ -51,7 +52,7 @@ class SteamCardFarmer {
 			return;
 		}
 
-		this.log(chalk.red(`Error: ${e}`));
+		this.log(chalk.red(e));
 	}
 
 	onDisconnected(eResult, msg) {
@@ -265,6 +266,20 @@ class SteamCardFarmer {
 		this.client.webLogOn();
 	}
 
+	// eslint-disable-next-line class-methods-use-this
+	onSteamGuard(domain, callback) {
+		inquirer
+			.prompt([
+				{
+					type: 'input',
+					name: 'code',
+					message: domain ? `Steam Guard Code (${domain}):` : 'Steam App Code',
+					validate: (input) => input.length === 5,
+				},
+			])
+			.then((result) => callback(result.code));
+	}
+
 	shutdown(code) {
 		this.client.logOff();
 		this.client.once('disconnected', () => {
@@ -302,31 +317,28 @@ function performLogon() {
 
 	if (process.argv.length === argsStartIdx + 2) {
 		farmer.logOn(process.argv[argsStartIdx], process.argv[argsStartIdx + 1]);
-	} else {
-		prompt.start();
-		prompt.get({
-			properties: {
-				username: {
-					type: 'string',
-					required: true,
-				},
-				password: {
-					type: 'string',
-					hidden: true,
-					replace: '*',
-					required: true,
-				},
-			},
-		}, (err, result) => {
-			if (err) {
-				farmer.log(`Error: ${err}`);
-				farmer.shutdown(1);
-				return;
-			}
-
-			farmer.logOn(result.username, result.password);
-		});
+		return;
 	}
+
+	const validate = (input) => input.length > 0;
+
+	inquirer
+		.prompt([
+			{
+				type: 'input',
+				name: 'username',
+				message: 'Enter username:',
+				validate,
+			},
+			{
+				type: 'password',
+				name: 'password',
+				message: 'Enter password:',
+				mask: '*',
+				validate,
+			},
+		])
+		.then((result) => farmer.logOn(result.username, result.password));
 }
 
 performLogon();
