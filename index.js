@@ -29,9 +29,9 @@ class SteamCardFarmer {
 		this.client.on('steamGuard', this.onSteamGuard.bind(this));
 	}
 
-	logOn(username, password) {
+	logOn(accountName, password) {
 		this.client.logOn({
-			accountName: username,
+			accountName,
 			password,
 			rememberPassword: true,
 			machineName: 'Steam-Card-Farmer',
