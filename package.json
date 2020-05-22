@@ -20,7 +20,7 @@
 		"cheerio": "1.0.0-rc.3",
 		"got": "^11.1.4",
 		"inquirer": "^7.1.0",
-		"steam-user": "^4.0.0",
+		"steam-user": "^4.15.4",
 		"tough-cookie": "^4.0.0"
 	},
 	"devDependencies": {
