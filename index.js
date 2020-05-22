@@ -95,13 +95,7 @@ class SteamCardFarmer {
 	}
 
 	async requestBadgesPage() {
-		if (this.playStateBlocked) {
-			this.log(chalk.red('Wanted to request badges page, but play state is blocked.'));
-			return;
-		}
-
-		if (this.requestInFlight) {
-			this.log(chalk.red('Wanted to request badges page, but a request is already in flight.'));
+		if (this.requestInFlight || this.playStateBlocked) {
 			return;
 		}
 
@@ -222,7 +216,6 @@ class SteamCardFarmer {
 		clearTimeout(this.checkTimer);
 
 		if (this.playStateBlocked) {
-			this.log(chalk.red('Wanted to check cards, but play state is blocked.'));
 			return;
 		}
 
