@@ -144,7 +144,6 @@ class SteamCardFarmer {
 			return;
 		}
 
-		let lowHourApps = [];
 		let appsWithDrops = [];
 		let totalDropsLeft = 0;
 		let totalApps = 0;
@@ -184,61 +183,26 @@ class SteamCardFarmer {
 				drops,
 			};
 
-			if (playtime < 120) {
-				lowHourApps.push(appObj);
-			} else {
-				appsWithDrops.push(appObj);
-			}
+			appsWithDrops.push(appObj);
 		});
-
-		if (totalDropsLeft > 0) {
-			this.log(`${chalk.green(totalDropsLeft)} card drop${totalDropsLeft === 1 ? '' : 's'}`
-				+ ` remaining across ${chalk.green(totalApps)}`
-				+ ` app${totalApps === 1 ? '' : 's'} on page ${this.page}`);
-		}
 
 		const MAX_APPS_AT_ONCE = 32;
 
-		if (appsWithDrops.length > 0) {
-			if (appsWithDrops.length >= MAX_APPS_AT_ONCE) {
-				appsWithDrops.sort((a, b) => {
-					if (a.drops === b.drops) {
-						return a.appid - b.appid;
-					}
+		if (totalDropsLeft > 0) {
+			this.log(`${chalk.green(totalDropsLeft)} card drop${
+				totalDropsLeft === 1 ? '' : 's'
+			} remaining across ${chalk.green(totalApps)} app${
+				totalApps === 1 ? '' : 's'
+			} on page ${this.page}`);
 
-					return a.drops - b.drops;
-				});
+			if (appsWithDrops.length > MAX_APPS_AT_ONCE) {
+				appsWithDrops.sort((a, b) => b.playtime - a.playtime);
 				appsWithDrops = appsWithDrops.slice(0, MAX_APPS_AT_ONCE);
-			} else if (lowHourApps.length > 0) {
-				const idleFill = lowHourApps.slice(0, MAX_APPS_AT_ONCE - appsWithDrops.length);
-				appsWithDrops = appsWithDrops.concat(idleFill);
 			}
-
-			this.log(`Idling ${chalk.green(appsWithDrops.length)} app${appsWithDrops.length === 1 ? '' : 's'}`);
 
 			this.client.gamesPlayed(appsWithDrops.map(({ appid }) => appid));
 
 			this.checkCardsInSeconds(5 * 60, this.quitPlaying.bind(this));
-		} else if (lowHourApps.length > 0) {
-			let minPlaytime = 120;
-
-			lowHourApps = lowHourApps.slice(0, MAX_APPS_AT_ONCE);
-			lowHourApps.forEach((app) => {
-				if (minPlaytime > app.playtime) {
-					minPlaytime = app.playtime;
-				}
-			});
-
-			minPlaytime = 120 - minPlaytime;
-
-			this.log(
-				`Idling ${chalk.green(lowHourApps.length)} app${lowHourApps.length === 1 ? '' : 's'}`
-				+ ` up to 2 hours. This will take ${chalk.green(minPlaytime)} minutes.`,
-			);
-
-			this.client.gamesPlayed(lowHourApps.map((app) => app.appid));
-
-			this.checkCardsInSeconds(60 * minPlaytime, this.quitPlaying.bind(this));
 		} else if (this.page <= (parseInt($('.pagelink').last().text(), 10) || 1)) {
 			this.log(chalk.green(`No drops remaining on page ${this.page}`));
 			this.page += 1;
