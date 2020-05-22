@@ -45,7 +45,7 @@ class SteamCardFarmer {
 		if (e.eresult === SteamUser.EResult.LoggedInElsewhere) {
 			this.playStateBlocked = true;
 
-			this.log(chalk.red('Another client logged in elsewhere, relogging in...'));
+			this.log(chalk.red('Another client logged in elsewhere.'));
 
 			setTimeout(() => this.client.logOn(true), 1000);
 
@@ -56,11 +56,12 @@ class SteamCardFarmer {
 	}
 
 	onDisconnected(eResult, msg) {
-		this.log(chalk.red(`Disconnected: Eresult.${eResult} - ${msg}`));
 		clearTimeout(this.checkTimer);
+
+		this.log(chalk.red(`Disconnected: ${msg}`));
 	}
 
-	onPlayingState(blocked, playingApp) {
+	onPlayingState(blocked) {
 		if (this.playStateBlocked === blocked) {
 			return;
 		}
@@ -68,12 +69,12 @@ class SteamCardFarmer {
 		this.playStateBlocked = blocked;
 
 		if (blocked) {
-			this.log(chalk.yellowBright(`App ${playingApp} was launched on another client, no longer idling.`));
 			clearTimeout(this.checkTimer);
-		} else {
-			this.log(chalk.yellowBright('Play state is no longer blocked.'));
-			this.checkCardsInSeconds(1);
+			return;
 		}
+
+		this.log(chalk.green('Play state is no longer blocked.'));
+		this.checkCardsInSeconds(1);
 	}
 
 	onNewItems(count) {
@@ -81,28 +82,32 @@ class SteamCardFarmer {
 			return;
 		}
 
-		this.log(chalk.yellowBright(`Got notification of new inventory items: ${count} new item${count === 1 ? '' : 's'}`));
-		this.checkCardsInSeconds(1);
+		this.log(chalk.green(`Got notification of new inventory items: ${count} new item${count === 1 ? '' : 's'}`));
+		this.checkCardsInSeconds(2);
 	}
 
-	async onWebSession(sessionID, cookies) {
+	onWebSession(sessionID, cookies) {
+		cookies.forEach((cookie) => {
+			this.cookieJar.setCookie(cookie, 'https://steamcommunity.com');
+		});
+
+		this.requestBadgesPage();
+	}
+
+	async requestBadgesPage() {
 		if (this.playStateBlocked) {
-			this.log(chalk.red('Got a web session, but play state is blocked.'));
+			this.log(chalk.red('Wanted to request badges page, but play state is blocked.'));
 			return;
 		}
 
 		if (this.requestInFlight) {
-			this.log(chalk.red('Got a web session, but a request is already in flight.'));
+			this.log(chalk.red('Wanted to request badges page, but a request is already in flight.'));
 			return;
 		}
 
 		this.requestInFlight = true;
 
-		this.log('Got a web session, checking card drops...');
-
-		cookies.forEach((cookie) => {
-			this.cookieJar.setCookie(cookie, 'https://steamcommunity.com');
-		});
+		this.log(`Checking card drops on page ${this.page}...`);
 
 		let url = '';
 
@@ -125,10 +130,6 @@ class SteamCardFarmer {
 			if (response.statusCode !== 200) {
 				throw new Error(`HTTP error ${response.statusCode}`);
 			}
-
-			if (response.body.includes('g_steamID = false')) {
-				throw new Error('Page loaded as logged out');
-			}
 		} catch (err) {
 			this.log(chalk.red(`Couldn't request badge page: ${err}`));
 			this.checkCardsInSeconds(30);
@@ -137,17 +138,29 @@ class SteamCardFarmer {
 			this.requestInFlight = false;
 		}
 
-		let lowHourApps = [];
-		const hasDropsApps = [];
+		if (response.body.includes('g_steamID = false')) {
+			this.log(chalk.red('Badge page loaded, but its logged out'));
+			this.client.webLogOn();
+			return;
+		}
 
+		let lowHourApps = [];
+		let appsWithDrops = [];
+		let totalDropsLeft = 0;
+		let totalApps = 0;
 		const $ = cheerio.load(response.body);
 
 		$('.progress_info_bold').each((index, infoline) => {
 			const match = $(infoline).text().match(/(\d+)/);
+
+			if (!match) {
+				return;
+			}
+
 			const row = $(infoline).closest('.badge_row');
 			const href = row.find('.badge_title_playgame a').attr('href');
 
-			if (!match || !href) {
+			if (!href) {
 				return;
 			}
 
@@ -159,16 +172,14 @@ class SteamCardFarmer {
 				return;
 			}
 
-			let title = row.find('.badge_title');
-			title.find('.badge_view_details').remove();
-			title = title.text().trim();
+			totalDropsLeft += drops;
+			totalApps += 1;
 
-			let playtime = parseFloat(row.find('.badge_title_stats').html().match(/(\d+\.\d+)/), 10) || 0.0;
+			let playtime = parseFloat(row.find('.badge_title_stats_playtime').text().match(/(\d+\.\d+)/), 10) || 0.0;
 			playtime = Math.round(playtime * 60);
 
 			const appObj = {
 				appid,
-				title,
 				playtime,
 				drops,
 			};
@@ -176,20 +187,46 @@ class SteamCardFarmer {
 			if (playtime < 120) {
 				lowHourApps.push(appObj);
 			} else {
-				hasDropsApps.push(appObj);
+				appsWithDrops.push(appObj);
 			}
 		});
 
-		if (lowHourApps.length > hasDropsApps.length) {
+		if (totalDropsLeft > 0) {
+			this.log(`${chalk.green(totalDropsLeft)} card drop${totalDropsLeft === 1 ? '' : 's'}`
+				+ ` remaining across ${chalk.green(totalApps)}`
+				+ ` app${totalApps === 1 ? '' : 's'} on page ${this.page}`);
+		}
+
+		const MAX_APPS_AT_ONCE = 32;
+
+		if (appsWithDrops.length > 0) {
+			if (appsWithDrops.length >= MAX_APPS_AT_ONCE) {
+				appsWithDrops.sort((a, b) => {
+					if (a.drops === b.drops) {
+						return a.appid - b.appid;
+					}
+
+					return a.drops - b.drops;
+				});
+				appsWithDrops = appsWithDrops.slice(0, MAX_APPS_AT_ONCE);
+			} else if (lowHourApps.length > 0) {
+				const idleFill = lowHourApps.slice(0, MAX_APPS_AT_ONCE - appsWithDrops.length);
+				appsWithDrops = appsWithDrops.concat(idleFill);
+			}
+
+			this.log(`Idling ${chalk.green(appsWithDrops.length)} app${appsWithDrops.length === 1 ? '' : 's'}`);
+
+			this.client.gamesPlayed(appsWithDrops.map(({ appid }) => appid));
+
+			this.checkCardsInSeconds(5 * 60, this.quitPlaying.bind(this));
+		} else if (lowHourApps.length > 0) {
 			let minPlaytime = 120;
 
-			lowHourApps = lowHourApps.slice(0, 32);
+			lowHourApps = lowHourApps.slice(0, MAX_APPS_AT_ONCE);
 			lowHourApps.forEach((app) => {
-				if (app.playtime < minPlaytime) {
+				if (minPlaytime > app.playtime) {
 					minPlaytime = app.playtime;
 				}
-
-				this.log(`App ${app.appid} - ${chalk.green(app.title)} - Playtime: ${chalk.green(app.playtime)} min`);
 			});
 
 			minPlaytime = 120 - minPlaytime;
@@ -201,45 +238,24 @@ class SteamCardFarmer {
 
 			this.client.gamesPlayed(lowHourApps.map((app) => app.appid));
 
-			this.checkCardsInSeconds(60 * minPlaytime, () => {
-				this.log('Stopped idling previous apps.');
-				this.client.gamesPlayed([]);
-			});
-		} else if (hasDropsApps.length > 0) {
-			const totalDropsLeft = hasDropsApps.reduce((sum, { drops }) => sum + drops, 0);
-			const appToIdle = hasDropsApps[0];
-
-			this.log(
-				`${chalk.green(totalDropsLeft)} card drop${totalDropsLeft === 1 ? '' : 's'}`
-				+ ` remaining across ${chalk.green(hasDropsApps.length)} app${hasDropsApps.length === 1 ? '' : 's'}`
-				+ ` ${chalk.cyan(`(page ${this.page})`)}`,
-			);
-
-			this.log(
-				`Idling app ${appToIdle.appid} "${chalk.green(appToIdle.title)}" - `
-				+ `${chalk.green(appToIdle.drops)} drop${appToIdle.drops === 1 ? '' : 's'} remaining.`,
-			);
-
-			this.client.gamesPlayed(appToIdle.appid);
-
-			// 20 minutes to be safe, we should automatically check when
-			// Steam notifies us that we got a new item anyway
-			this.checkCardsInSeconds(1200);
+			this.checkCardsInSeconds(60 * minPlaytime, this.quitPlaying.bind(this));
 		} else if (this.page <= (parseInt($('.pagelink').last().text(), 10) || 1)) {
 			this.log(chalk.green(`No drops remaining on page ${this.page}`));
 			this.page += 1;
 			this.log(`Checking page ${this.page}...`);
 			this.checkCardsInSeconds(1);
 		} else {
-			this.log(chalk.green('All card drops received! Shutting down...'));
+			this.log(chalk.green('All card drops received!'));
 			this.shutdown(0);
 		}
 	}
 
+	quitPlaying() {
+		this.client.gamesPlayed([]);
+	}
+
 	checkCardsInSeconds(seconds, callback) {
-		if (this.checkTimer) {
-			clearTimeout(this.checkTimer);
-		}
+		clearTimeout(this.checkTimer);
 
 		if (this.playStateBlocked) {
 			this.log(chalk.red('Wanted to check cards, but play state is blocked.'));
@@ -251,19 +267,8 @@ class SteamCardFarmer {
 				callback();
 			}
 
-			this.checkCardApps();
+			this.requestBadgesPage();
 		}, 1000 * seconds);
-	}
-
-	checkCardApps() {
-		if (this.requestInFlight) {
-			this.log(chalk.red('Wanted to request a web session, but a request is already in flight.'));
-			return;
-		}
-
-		this.log('Requesting a web session...');
-
-		this.client.webLogOn();
 	}
 
 	// eslint-disable-next-line class-methods-use-this

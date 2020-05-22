@@ -19,8 +19,6 @@ If not provided on the command line, it'll prompt you for your Steam username an
 
 If you have games with remaining drops which have less than 2 hours of playtime, the app will first mass-idle all of them up to 2 hours. Then it will start switching through them to get card drops. If you have purchased a game in the past 14 days, **idling it will waive your right to a refund on Steam**.
 
-It'll automatically switch through all games you have with remaining card drops (it checks every 20 minutes or immediately when a new item is received). One could theoretically mass-idle all games at once, but it takes just as long and this way doesn't rack up unnecessary fake playtime.
-
 If you want to play a game while idler is running, press **Continue Launch** in Steam, and idler will wait until you finish playing to resume idling. You do not need to shut down the idler.
 
 ### License
