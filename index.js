@@ -285,6 +285,44 @@ class SteamCardFarmer {
 			.then((result) => callback(result.code));
 	}
 
+
+	init() {
+		process.on('SIGINT', () => {
+			this.log('Logging off and shutting down...');
+			this.shutdown(0);
+		});
+
+		let argsStartIdx = 2;
+		if (process.argv[0] === 'steamcardfarmer') {
+			argsStartIdx = 1;
+		}
+
+		if (process.argv.length === argsStartIdx + 2) {
+			this.logOn(process.argv[argsStartIdx], process.argv[argsStartIdx + 1]);
+			return;
+		}
+
+		const validate = (input) => input.length > 0;
+
+		inquirer
+			.prompt([
+				{
+					type: 'input',
+					name: 'username',
+					message: 'Enter username:',
+					validate,
+				},
+				{
+					type: 'password',
+					name: 'password',
+					message: 'Enter password:',
+					mask: '*',
+					validate,
+				},
+			])
+			.then((result) => this.logOn(result.username, result.password));
+	}
+
 	shutdown(code) {
 		this.client.logOff();
 		this.client.once('disconnected', () => {
@@ -307,43 +345,5 @@ class SteamCardFarmer {
 	}
 }
 
-function performLogon() {
-	const farmer = new SteamCardFarmer();
-
-	process.on('SIGINT', () => {
-		farmer.log('Logging off and shutting down...');
-		farmer.shutdown(0);
-	});
-
-	let argsStartIdx = 2;
-	if (process.argv[0] === 'steamcardfarmer') {
-		argsStartIdx = 1;
-	}
-
-	if (process.argv.length === argsStartIdx + 2) {
-		farmer.logOn(process.argv[argsStartIdx], process.argv[argsStartIdx + 1]);
-		return;
-	}
-
-	const validate = (input) => input.length > 0;
-
-	inquirer
-		.prompt([
-			{
-				type: 'input',
-				name: 'username',
-				message: 'Enter username:',
-				validate,
-			},
-			{
-				type: 'password',
-				name: 'password',
-				message: 'Enter password:',
-				mask: '*',
-				validate,
-			},
-		])
-		.then((result) => farmer.logOn(result.username, result.password));
-}
-
-performLogon();
+const farmer = new SteamCardFarmer();
+farmer.init();
