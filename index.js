@@ -121,25 +121,20 @@ class SteamCardFarmer {
 				timeout: 10000,
 				cookieJar: this.cookieJar,
 			});
+
+			if (response.statusCode !== 200) {
+				throw new Error(`HTTP error ${response.statusCode}`);
+			}
+
+			if (response.body.includes('g_steamID = false')) {
+				throw new Error('Page loaded as logged out');
+			}
 		} catch (err) {
 			this.log(chalk.red(`Couldn't request badge page: ${err}`));
 			this.checkCardsInSeconds(30);
+			return;
+		} finally {
 			this.requestInFlight = false;
-			return;
-		}
-
-		this.requestInFlight = false;
-
-		if (response.statusCode !== 200) {
-			this.log(chalk.red(`Couldn't request badge page: HTTP error ${response.statusCode}`));
-			this.checkCardsInSeconds(30);
-			return;
-		}
-
-		if (response.body.includes('g_steamID = false')) {
-			this.log(chalk.red('Badge page loaded, but its logged out'));
-			this.checkCardsInSeconds(30);
-			return;
 		}
 
 		let lowHourApps = [];
