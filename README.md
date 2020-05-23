@@ -17,7 +17,7 @@ On the command line, just type `node index.js`. Optionally include your username
 
 If not provided on the command line, it'll prompt you for your Steam username and password.
 
-If you have games with remaining drops which have less than 2 hours of playtime, the app will first mass-idle all of them up to 2 hours. Then it will start switching through them to get card drops. If you have purchased a game in the past 14 days, **idling it will waive your right to a refund on Steam**.
+If you have purchased a game in the past 14 days, **idling it will waive your right to a refund on Steam**.
 
 If you want to play a game while idler is running, press **Continue Launch** in Steam, and idler will wait until you finish playing to resume idling. You do not need to shut down the idler.
 
