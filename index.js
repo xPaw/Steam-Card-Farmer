@@ -235,7 +235,7 @@ class SteamCardFarmer {
 				{
 					type: 'input',
 					name: 'code',
-					message: domain ? `Steam Guard Code (${domain}):` : 'Steam App Code:',
+					message: domain ? `Steam guard code sent to ${domain}:` : 'Steam app code:',
 					validate: (input) => input.length === 5,
 				},
 			])
@@ -266,13 +266,13 @@ class SteamCardFarmer {
 				{
 					type: 'input',
 					name: 'username',
-					message: 'Enter username:',
+					message: 'Steam username:',
 					validate,
 				},
 				{
 					type: 'password',
 					name: 'password',
-					message: 'Enter password:',
+					message: 'Steam password:',
 					mask: '*',
 					validate,
 				},
