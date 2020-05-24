@@ -13,6 +13,7 @@ class SteamCardFarmer {
 		this.checkTimer = null;
 		this.requestInFlight = false;
 		this.playStateBlocked = false;
+		this.resetToFirstPage = false;
 
 		this.cookieJar = new tough.CookieJar();
 		this.cookieJar.setCookie('Steam_Language=english', 'https://steamcommunity.com');
@@ -183,6 +184,8 @@ class SteamCardFarmer {
 		const MAX_APPS_AT_ONCE = 32;
 
 		if (totalDropsLeft > 0) {
+			this.resetToFirstPage = true;
+
 			this.log(`${chalk.green(totalDropsLeft)} card drop${
 				totalDropsLeft === 1 ? '' : 's'
 			} remaining across ${chalk.green(totalApps)} app${
@@ -201,6 +204,11 @@ class SteamCardFarmer {
 			this.log(chalk.green(`No drops remaining on page ${this.page}`));
 			this.page += 1;
 			this.log(`Checking page ${this.page}...`);
+			this.checkCardsInSeconds(1);
+		} else if (this.page > 1 && this.resetToFirstPage) {
+			this.log(chalk.green('All pages checked, resetting to page 1 and checking again'));
+			this.resetToFirstPage = false;
+			this.page = 1;
 			this.checkCardsInSeconds(1);
 		} else {
 			this.log(chalk.green('All card drops received!'));
