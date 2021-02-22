@@ -250,7 +250,6 @@ class SteamCardFarmer {
 			.then((result) => callback(result.code));
 	}
 
-
 	init() {
 		process.on('SIGINT', () => {
 			this.log('Logging off and shutting down...');
