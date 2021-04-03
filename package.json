@@ -18,13 +18,13 @@
 	"dependencies": {
 		"chalk": "^4.1.0",
 		"cheerio": "^1.0.0-rc.5",
-		"got": "^11.8.1",
-		"inquirer": "^7.3.3",
-		"steam-user": "^4.19.3",
+		"got": "^11.8.2",
+		"inquirer": "^8.0.0",
+		"steam-user": "^4.19.4",
 		"tough-cookie": "^4.0.0"
 	},
 	"devDependencies": {
-		"eslint": "7",
+		"eslint": "^7.23.0",
 		"eslint-config-airbnb-base": "^14.2.1",
 		"eslint-plugin-import": "^2.22.1"
 	}
