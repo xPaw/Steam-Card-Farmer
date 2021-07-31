@@ -16,16 +16,16 @@
 		"url": "https://github.com/xPaw/Steam-Card-Farmer"
 	},
 	"dependencies": {
-		"chalk": "^4.1.0",
+		"chalk": "^4.1.2",
 		"cheerio": "^1.0.0-rc.5",
 		"got": "^11.8.2",
 		"inquirer": "^8.0.0",
-		"steam-user": "^4.19.4",
+		"steam-user": "^4.19.12",
 		"tough-cookie": "^4.0.0"
 	},
 	"devDependencies": {
-		"eslint": "^7.23.0",
+		"eslint": "^7.32.0",
 		"eslint-config-airbnb-base": "^14.2.1",
-		"eslint-plugin-import": "^2.22.1"
+		"eslint-plugin-import": "^2.23.4"
 	}
 }
