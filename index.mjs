@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
-const chalk = require('chalk');
-const cheerio = require('cheerio');
-const got = require('got');
-const inquirer = require('inquirer');
-const SteamUser = require('steam-user');
-const tough = require('tough-cookie');
+import chalk from 'chalk';
+import { load as cheerio } from 'cheerio';
+import got from 'got';
+import inquirer from 'inquirer';
+import SteamUser from 'steam-user';
+import tough from 'tough-cookie';
 
 class SteamCardFarmer {
 	constructor() {
@@ -117,9 +117,12 @@ class SteamCardFarmer {
 		try {
 			response = await got({
 				url: `https://steamcommunity.com/${url}/badges/?l=english&p=${this.page}`,
-				followRedirect: false,
-				timeout: 10000,
 				cookieJar: this.cookieJar,
+				followRedirect: false,
+				timeout: {
+					request: 5000,
+					response: 5000,
+				},
 			});
 
 			if (response.statusCode !== 200) {
@@ -142,7 +145,7 @@ class SteamCardFarmer {
 		let appsWithDrops = [];
 		let totalDropsLeft = 0;
 		let totalApps = 0;
-		const $ = cheerio.load(response.body);
+		const $ = cheerio(response.body);
 
 		$('.progress_info_bold').each((index, infoline) => {
 			const match = $(infoline).text().match(/(\d+)/);
