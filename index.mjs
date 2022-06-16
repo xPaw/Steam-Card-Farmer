@@ -70,6 +70,7 @@ class SteamCardFarmer {
 		this.playStateBlocked = blocked;
 
 		if (blocked) {
+			this.log(chalk.red('Play state is blocked by another client.'));
 			clearTimeout(this.checkTimer);
 			return;
 		}
@@ -92,7 +93,7 @@ class SteamCardFarmer {
 			this.cookieJar.setCookie(cookie, 'https://steamcommunity.com');
 		});
 
-		this.requestBadgesPage();
+		this.checkCardsInSeconds(2);
 	}
 
 	async requestBadgesPage() {
@@ -137,8 +138,13 @@ class SteamCardFarmer {
 		}
 
 		if (response.body.includes('g_steamID = false')) {
-			this.log(chalk.red('Badge page loaded, but its logged out'));
+			this.log(chalk.red('Badge page loaded, but it is logged out.'));
 			this.client.webLogOn();
+			return;
+		}
+
+		if (this.playStateBlocked) {
+			this.log(chalk.red('Play state got blocked while loading badge page.'));
 			return;
 		}
 
