@@ -76,7 +76,7 @@ class SteamCardFarmer {
 		}
 
 		this.log(chalk.green('Play state is no longer blocked.'));
-		this.checkCardsInSeconds(1);
+		this.checkCardsInSeconds(30);
 	}
 
 	onNewItems(count) {
