@@ -1,8 +1,6 @@
 # Steam Card Farmer
 
-## Requires latest Node.js version.
-
-Designed for advanced users.
+This script will idle all cards for all your games by playing up to 32 games at once.
 
 ### Installation
 
@@ -13,7 +11,7 @@ Designed for advanced users.
 
 ### Usage
 
-On the command line, just type `node index.js`. Optionally include your username and password as arguments, as such: `node index.js steamusername steampassword`.
+On the command line, just type `npm start`. Optionally include your username and password as arguments, as such: `npm start steamusername steampassword`.
 
 If not provided on the command line, it'll prompt you for your Steam username and password.
 
@@ -23,4 +21,4 @@ If you want to play a game while idler is running, press **Continue Launch** in 
 
 ### License
 
-Released under [the MIT license](http://opensource.org/licenses/MIT).
+Released under [the MIT license](https://opensource.org/license/mit/).
