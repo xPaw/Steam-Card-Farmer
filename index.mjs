@@ -34,7 +34,6 @@ class SteamCardFarmer {
 		this.client.logOn({
 			accountName,
 			password,
-			rememberPassword: true,
 			machineName: 'Steam-Card-Farmer',
 			logonID: 66666666,
 		});

@@ -19,9 +19,9 @@
 	"dependencies": {
 		"chalk": "^5.0.1",
 		"cheerio": "^1.0.0-rc.12",
-		"got": "^12.4.1",
+		"got": "^13.0.0",
 		"inquirer": "^9.1.1",
-		"steam-user": "^4.25.0",
+		"steam-user": "^5.0.1",
 		"tough-cookie": "^4.1.2"
 	},
 	"devDependencies": {
