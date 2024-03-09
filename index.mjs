@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import chalk from 'chalk';
-import { load as cheerio } from 'cheerio';
-import inquirer from 'inquirer';
 import SteamUser from 'steam-user';
+import chalk from 'ansi-colors';
+import enquirer from 'enquirer';
+import { load as cheerio } from 'cheerio';
 
 class SteamCardFarmer {
 	constructor() {
@@ -246,7 +246,7 @@ class SteamCardFarmer {
 
 	// eslint-disable-next-line class-methods-use-this
 	onSteamGuard(domain, callback) {
-		inquirer
+		enquirer
 			.prompt([
 				{
 					type: 'input',
@@ -276,7 +276,7 @@ class SteamCardFarmer {
 
 		const validate = (input) => input.length > 0;
 
-		inquirer
+		enquirer
 			.prompt([
 				{
 					type: 'input',
@@ -288,7 +288,6 @@ class SteamCardFarmer {
 					type: 'password',
 					name: 'password',
 					message: 'Steam password:',
-					mask: '*',
 					validate,
 				},
 			])
