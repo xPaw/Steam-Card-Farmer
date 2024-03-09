@@ -2,10 +2,8 @@
 
 import chalk from 'chalk';
 import { load as cheerio } from 'cheerio';
-import got from 'got';
 import inquirer from 'inquirer';
 import SteamUser from 'steam-user';
-import tough from 'tough-cookie';
 
 class SteamCardFarmer {
 	constructor() {
@@ -15,9 +13,7 @@ class SteamCardFarmer {
 		this.playStateBlocked = false;
 		this.resetToFirstPage = false;
 
-		this.cookieJar = new tough.CookieJar();
-		this.cookieJar.setCookie('Steam_Language=english', 'https://steamcommunity.com');
-
+		this.cookies = [];
 		this.client = new SteamUser({
 			protocol: SteamUser.EConnectionProtocol.TCP,
 		});
@@ -88,9 +84,8 @@ class SteamCardFarmer {
 	}
 
 	onWebSession(sessionID, cookies) {
-		cookies.forEach((cookie) => {
-			this.cookieJar.setCookie(cookie, 'https://steamcommunity.com');
-		});
+		this.cookies = cookies;
+		this.cookies.push('Steam_Language=english');
 
 		this.checkCardsInSeconds(2);
 	}
@@ -115,18 +110,21 @@ class SteamCardFarmer {
 		let response;
 
 		try {
-			response = await got({
-				url: `https://steamcommunity.com/${url}/badges/?l=english&p=${this.page}`,
-				cookieJar: this.cookieJar,
-				followRedirect: false,
-				timeout: {
-					request: 5000,
-					response: 5000,
-				},
-			});
+			const headers = new Headers();
+			headers.append('User-Agent', 'Steam-Card-Farmer (+https://github.com/xPaw/Steam-Card-Farmer)');
+			headers.append('Cookie', this.cookies.join('; '));
 
-			if (response.statusCode !== 200) {
-				throw new Error(`HTTP error ${response.statusCode}`);
+			response = await fetch(
+				`https://steamcommunity.com/${url}/badges/?l=english&p=${this.page}`,
+				{
+					headers,
+					redirect: 'error',
+					signal: AbortSignal.timeout(10000),
+				},
+			);
+
+			if (response.status !== 200) {
+				throw new Error(`HTTP error ${response.status}`);
 			}
 		} catch (err) {
 			this.log(chalk.red(`Couldn't request badge page: ${err}`));
@@ -136,7 +134,9 @@ class SteamCardFarmer {
 			this.requestInFlight = false;
 		}
 
-		if (response.body.includes('g_steamID = false')) {
+		const text = await response.text();
+
+		if (text.includes('g_steamID = false')) {
 			this.log(chalk.red('Badge page loaded, but it is logged out.'));
 			this.client.webLogOn();
 			return;
@@ -150,7 +150,7 @@ class SteamCardFarmer {
 		let appsWithDrops = [];
 		let totalDropsLeft = 0;
 		let totalApps = 0;
-		const $ = cheerio(response.body);
+		const $ = cheerio(text);
 
 		$('.progress_info_bold').each((index, infoline) => {
 			const match = $(infoline).text().match(/(\d+)/);
