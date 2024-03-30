@@ -13,6 +13,7 @@ class SteamCardFarmer {
 		this.playStateBlocked = false;
 		this.resetToFirstPage = false;
 
+		/** @type {String[]} */
 		this.cookies = [];
 		this.client = new SteamUser({
 			protocol: SteamUser.EConnectionProtocol.TCP,
@@ -26,6 +27,10 @@ class SteamCardFarmer {
 		this.client.on('steamGuard', this.onSteamGuard.bind(this));
 	}
 
+	/**
+	 * @param {String} accountName
+	 * @param {String} password
+	 */
 	logOn(accountName, password) {
 		this.client.logOn({
 			accountName,
@@ -35,6 +40,9 @@ class SteamCardFarmer {
 		});
 	}
 
+	/**
+	 * @param {Error & ({eresult: SteamUser.EResult})} e
+	 */
 	onError(e) {
 		clearTimeout(this.checkTimer);
 
@@ -48,15 +56,22 @@ class SteamCardFarmer {
 			return;
 		}
 
-		this.log(chalk.red(e));
+		this.log(chalk.red(e.toString()));
 	}
 
+	/**
+	 * @param {SteamUser.EResult} eResult
+	 * @param {String} msg
+	 */
 	onDisconnected(eResult, msg) {
 		clearTimeout(this.checkTimer);
 
 		this.log(chalk.red(`Disconnected: ${msg}`));
 	}
 
+	/**
+	 * @param {Boolean} blocked
+	 */
 	onPlayingState(blocked) {
 		if (this.playStateBlocked === blocked) {
 			return;
@@ -74,6 +89,9 @@ class SteamCardFarmer {
 		this.checkCardsInSeconds(30);
 	}
 
+	/**
+	 * @param {Number} count
+	 */
 	onNewItems(count) {
 		if (count === 0) {
 			return;
@@ -83,6 +101,10 @@ class SteamCardFarmer {
 		this.checkCardsInSeconds(2);
 	}
 
+	/**
+	 * @param {String} sessionID
+	 * @param {String[]} cookies
+	 */
 	onWebSession(sessionID, cookies) {
 		this.cookies = cookies;
 		this.cookies.push('Steam_Language=english');
@@ -147,6 +169,7 @@ class SteamCardFarmer {
 			return;
 		}
 
+		/** @type {{appid: number, playtime: number, drops: number}[]} */
 		let appsWithDrops = [];
 		let totalDropsLeft = 0;
 		let totalApps = 0;
@@ -177,8 +200,13 @@ class SteamCardFarmer {
 			totalDropsLeft += drops;
 			totalApps += 1;
 
-			let playtime = parseFloat(row.find('.badge_title_stats_playtime').text().match(/(\d+\.\d+)/), 10) || 0.0;
-			playtime = Math.round(playtime * 60);
+			let playtime = 0.0;
+			const playTimeMatch = row.find('.badge_title_stats_playtime').text().match(/(?<playtime>\d+\.\d+)/);
+
+			if (playTimeMatch) {
+				playtime = parseFloat(playTimeMatch.groups.playtime) || 0.0;
+				playtime = Math.round(playtime * 60);
+			}
 
 			const appObj = {
 				appid,
@@ -194,9 +222,9 @@ class SteamCardFarmer {
 		if (totalDropsLeft > 0) {
 			this.resetToFirstPage = true;
 
-			this.log(`${chalk.green(totalDropsLeft)} card drop${
+			this.log(`${chalk.green(String(totalDropsLeft))} card drop${
 				totalDropsLeft === 1 ? '' : 's'
-			} remaining across ${chalk.green(totalApps)} app${
+			} remaining across ${chalk.green(String(totalApps))} app${
 				totalApps === 1 ? '' : 's'
 			} on page ${this.page}`);
 
@@ -228,7 +256,11 @@ class SteamCardFarmer {
 		this.client.gamesPlayed([]);
 	}
 
-	checkCardsInSeconds(seconds, callback) {
+	/**
+	 * @param {Number} seconds
+	 * @param {Function|null} callback
+	 */
+	checkCardsInSeconds(seconds, callback = null) {
 		clearTimeout(this.checkTimer);
 
 		if (this.playStateBlocked) {
@@ -244,6 +276,10 @@ class SteamCardFarmer {
 		}, 1000 * seconds);
 	}
 
+	/**
+	 * @param {String} domain
+	 * @param {Function} callback
+	 */
 	// eslint-disable-next-line class-methods-use-this
 	onSteamGuard(domain, callback) {
 		enquirer
@@ -255,7 +291,8 @@ class SteamCardFarmer {
 					validate: (input) => input.length === 5,
 				},
 			])
-			.then((result) => callback(result.code));
+			.then((/** @type {{code: String}} */ result) => callback(result.code))
+			.catch(console.error); // eslint-disable-line no-console
 	}
 
 	init() {
@@ -274,7 +311,7 @@ class SteamCardFarmer {
 			return;
 		}
 
-		const validate = (input) => input.length > 0;
+		const validate = (/** @type string */ input) => input.length > 0;
 
 		enquirer
 			.prompt([
@@ -291,9 +328,17 @@ class SteamCardFarmer {
 					validate,
 				},
 			])
-			.then((result) => this.logOn(result.username, result.password));
+			.then(
+				(
+					/** @type {{username: String, password: String}} */ result,
+				) => this.logOn(result.username, result.password),
+			)
+			.catch(console.error); // eslint-disable-line no-console
 	}
 
+	/**
+	 * @param {Number} code
+	 */
 	shutdown(code) {
 		this.client.logOff();
 		this.client.once('disconnected', () => {
@@ -305,6 +350,9 @@ class SteamCardFarmer {
 		}, 500);
 	}
 
+	/**
+	 * @param {String} message
+	 */
 	// eslint-disable-next-line class-methods-use-this
 	log(message) {
 		const date = new Date();
