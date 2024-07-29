@@ -1,4 +1,6 @@
-extends: airbnb-base
+extends:
+ - airbnb-base
+ - prettier
 
 parserOptions:
   ecmaVersion: latest
@@ -6,7 +8,3 @@ parserOptions:
 
 env:
   node: true
-
-rules:
-  indent: [error, tab]
-  no-tabs: off

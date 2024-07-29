@@ -10,7 +10,8 @@
 	},
 	"scripts": {
 		"start": "node index.mjs",
-		"test": "eslint index.mjs",
+		"format": "prettier --write index.mjs",
+		"test": "eslint index.mjs && prettier --check index.mjs",
 		"tsc": "tsc -p jsconfig.json"
 	},
 	"repository": {
@@ -26,6 +27,8 @@
 	"devDependencies": {
 		"eslint": "^8.23.1",
 		"eslint-config-airbnb-base": "^15.0.0",
+		"eslint-config-prettier": "^9.1.0",
+		"prettier": "^3.3.3",
 		"typescript": "^5.4.3"
 	}
 }
