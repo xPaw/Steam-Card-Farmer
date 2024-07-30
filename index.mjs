@@ -557,6 +557,7 @@ class SteamCardFarmer {
 	 * @param {Number} code
 	 */
 	shutdown(code) {
+		this.client.gamesPlayed([]);
 		this.client.logOff();
 		this.client.once("disconnected", () => {
 			process.exit(code);
