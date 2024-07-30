@@ -269,14 +269,6 @@ class SteamCardFarmer {
 
 		const totalDropsLeft = this.appsWithDrops.reduce((total, { drops }) => total + drops, 0);
 
-		this.log(
-			`${chalk.green(String(totalDropsLeft))} card drop${
-				totalDropsLeft === 1 ? "" : "s"
-			} remaining across ${chalk.green(String(this.appsWithDrops.length))} app${
-				this.appsWithDrops.length === 1 ? "" : "s"
-			}`,
-		);
-
 		const { requiresIdling, appsToPlay } = this.getAppsToPlay();
 		const appids = appsToPlay.map(({ appid }) => appid);
 
@@ -288,11 +280,21 @@ class SteamCardFarmer {
 			// take the median time until minimum playtime is reached and then check again
 			const medianPlaytime = appsToPlay[Math.floor(appsToPlay.length / 2)];
 			idleMinutes = Math.max(1, MIN_PLAYTIME_TO_IDLE - medianPlaytime.playtime);
-		}
 
-		this.log(
-			`Idling ${chalk.green(String(appsToPlay.length))} apps for ${chalk.green(String(idleMinutes))} minutes (${appids.join(", ")})`,
-		);
+			this.log(
+				`Idling ${chalk.green(String(appsToPlay.length))} apps for ${chalk.green(String(idleMinutes))} minutes - for playtime`,
+			);
+		} else {
+			this.log(
+				`Idling ${chalk.green(String(appsToPlay.length))} apps for ${chalk.green(String(idleMinutes))} minutes - ${chalk.green(
+					String(totalDropsLeft),
+				)} card drop${
+					totalDropsLeft === 1 ? "" : "s"
+				} remaining across ${chalk.green(String(this.appsWithDrops.length))} app${
+					this.appsWithDrops.length === 1 ? "" : "s"
+				}`,
+			);
+		}
 
 		this.checkTimer = setTimeout(
 			async () => {
@@ -472,7 +474,8 @@ class SteamCardFarmer {
 			for (const notification of newItems) {
 				const item = JSON.parse(notification.body_data);
 
-				if (!item || item.app_id != 753 || item.context_id != 6) { // eslint-disable-line eqeqeq
+				if (!item || item.app_id != 753 || item.context_id != 6) {
+					// eslint-disable-line eqeqeq
 					continue;
 				}
 
