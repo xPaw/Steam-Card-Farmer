@@ -463,8 +463,6 @@ class SteamCardFarmer {
 				body,
 			);
 
-			console.log(notifications); // eslint-disable-line
-
 			const notificationIdsToRead = [];
 			const newItems = notifications.notifications.filter(
 				(notification) =>
@@ -473,11 +471,18 @@ class SteamCardFarmer {
 
 			for (const notification of newItems) {
 				const item = JSON.parse(notification.body_data);
-				const itemSourceAppId = item && item.source_appid;
+
+				if (!item || item.app_id != 753 || item.context_id != 6) { // eslint-disable-line eqeqeq
+					continue;
+				}
+
+				const itemSourceAppId = item.source_appid;
 				const appIndex = this.appsWithDrops.findIndex(({ appid }) => appid === itemSourceAppId);
 
 				if (appIndex < 0) {
-					this.log(`Got item drop for app ${itemSourceAppId}, but that is not an app we are idling`);
+					this.log(
+						`Got item drop for app ${itemSourceAppId}, but that is not an app we are idling - ${notification.body_data})`,
+					);
 					continue;
 				}
 
