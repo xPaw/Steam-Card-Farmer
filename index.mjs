@@ -337,10 +337,10 @@ class SteamCardFarmer {
 					app.playtime += idleMinutes;
 				}
 
-				this.client.gamesPlayed([]);
-
-				if (!requiresIdling) {
+				if (requiresIdling) {
 					await this.cycleApps(appids);
+				} else {
+					this.client.gamesPlayed([]);
 				}
 
 				this.checkTimer = setTimeout(() => {
@@ -403,7 +403,7 @@ class SteamCardFarmer {
 	async cycleApps(appids) {
 		this.log("Cycling apps...");
 
-		let current = 0;
+		let current = 1;
 
 		do {
 			await setTimeoutAsync(CYCLE_DELAY);
@@ -413,14 +413,11 @@ class SteamCardFarmer {
 				return;
 			}
 
-			this.client.gamesPlayed(appids[current]);
+			// quit apps one by one until the list is empty
+			this.client.gamesPlayed(appids.slice(current));
 
 			current += 1;
-		} while (current < appids.length);
-
-		await setTimeoutAsync(CYCLE_DELAY);
-
-		this.client.gamesPlayed([]);
+		} while (current <= appids.length);
 	}
 
 	/**
