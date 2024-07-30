@@ -6,6 +6,7 @@ import enquirer from "enquirer";
 import { load as cheerio } from "cheerio";
 import { promisify } from "util";
 import { readFileSync } from "fs";
+import { resolve as resolvePath } from "path";
 import ProtobufJS from "protobufjs";
 
 const setTimeoutAsync = promisify(setTimeout);
@@ -21,25 +22,34 @@ const MAX_APPS_AT_ONCE = 32; // how many apps to idle at once
 const MIN_PLAYTIME_TO_IDLE = 180; // minimum playtime in minutes without cycling
 const CYCLE_DELAY = 1000; // how many milliseconds to wait between cycling apps
 
+/**
+ * @param {Array} arr
+ * @param {Number} end
+ */
+function arrayTakeFirst(arr, end) {
+	const result = [];
+
+	for (let i = 0; i < end && i < arr.length; i += 1) {
+		result.push(arr[i]);
+	}
+
+	return result;
+}
+
 class SteamCardFarmer {
-	page = 1;
+	/** @type {{appid: number, playtime: number, drops: number}[]} */
+	appsWithDrops = [];
 
 	checkTimer = null;
 
-	requestInFlight = false;
-
 	playStateBlocked = false;
-
-	resetToFirstPage = false;
 
 	idling = false;
 
 	/** @type {String[]} */
 	cookies = [];
 
-	client = new SteamUser({
-		protocol: SteamUser.EConnectionProtocol.TCP,
-	});
+	client = new SteamUser();
 
 	/**
 	 * @param {String} accountName
@@ -55,7 +65,6 @@ class SteamCardFarmer {
 	}
 
 	onLoggedIn() {
-		this.idling = false;
 		this.log("Logged into Steam!");
 	}
 
@@ -85,6 +94,8 @@ class SteamCardFarmer {
 	onDisconnected(eResult, msg) {
 		clearTimeout(this.checkTimer);
 
+		this.idling = false;
+
 		this.log(chalk.red(`Disconnected: ${msg}`));
 	}
 
@@ -105,7 +116,7 @@ class SteamCardFarmer {
 		}
 
 		this.log(chalk.green("Play state is no longer blocked."));
-		this.checkCardsInSeconds(30);
+		this.idle();
 	}
 
 	/**
@@ -118,9 +129,7 @@ class SteamCardFarmer {
 
 		this.log(chalk.green(`Got ${count} new item${count === 1 ? "" : "s"}`));
 
-		if (this.idling) {
-			this.checkCardsInSeconds(2);
-		}
+		// TODO: If reaching 100 request inventory page to reset the counter?
 	}
 
 	/**
@@ -131,17 +140,18 @@ class SteamCardFarmer {
 		this.cookies = cookies;
 		this.cookies.push("Steam_Language=english");
 
-		this.checkCardsInSeconds(2);
+		clearTimeout(this.checkTimer);
+		this.checkTimer = setTimeout(() => {
+			this.appsWithDrops = [];
+			this.requestBadgesPage(1);
+		}, 1000 * 2);
 	}
 
-	async requestBadgesPage() {
-		if (this.requestInFlight || this.playStateBlocked) {
-			return;
-		}
-
-		this.requestInFlight = true;
-
-		this.log(`Checking card drops on page ${this.page}...`);
+	/**
+	 * @param {Number} page
+	 */
+	async requestBadgesPage(page) {
+		this.log(`${chalk.green(`Page ${page}`)}: checking...`);
 
 		let url = "";
 
@@ -158,7 +168,7 @@ class SteamCardFarmer {
 			headers.append("User-Agent", "Steam-Card-Farmer (+https://github.com/xPaw/Steam-Card-Farmer)");
 			headers.append("Cookie", this.cookies.join("; "));
 
-			response = await fetch(`https://steamcommunity.com/${url}/badges/?l=english&p=${this.page}`, {
+			response = await fetch(`https://steamcommunity.com/${url}/badges/?l=english&p=${page}`, {
 				headers,
 				redirect: "error",
 				signal: AbortSignal.timeout(10000),
@@ -169,10 +179,9 @@ class SteamCardFarmer {
 			}
 		} catch (err) {
 			this.log(chalk.red(`Couldn't request badge page: ${err}`));
-			this.checkCardsInSeconds(30);
+
+			this.checkTimer = setTimeout(() => this.requestBadgesPage(page), 30000);
 			return;
-		} finally {
-			this.requestInFlight = false;
 		}
 
 		const text = await response.text();
@@ -183,14 +192,8 @@ class SteamCardFarmer {
 			return;
 		}
 
-		if (this.playStateBlocked) {
-			this.log(chalk.red("Play state got blocked while loading badge page."));
-			return;
-		}
-
-		/** @type {{appid: number, playtime: number, drops: number}[]} */
-		const appsWithDrops = [];
-		let totalDropsLeft = 0;
+		let pageDrops = 0;
+		let pageApps = 0;
 		const $ = cheerio(text);
 
 		$(".progress_info_bold").each((index, infoline) => {
@@ -215,7 +218,8 @@ class SteamCardFarmer {
 				return;
 			}
 
-			totalDropsLeft += drops;
+			pageDrops += drops;
+			pageApps += 1;
 
 			let playtime = 0.0;
 			const playTimeMatch = row
@@ -234,106 +238,124 @@ class SteamCardFarmer {
 				drops,
 			};
 
-			appsWithDrops.push(appObj);
+			this.appsWithDrops.push(appObj);
 		});
 
-		if (totalDropsLeft > 0) {
-			this.resetToFirstPage = true;
-
+		if (pageDrops > 0) {
 			this.log(
-				`${chalk.green(String(totalDropsLeft))} card drop${
-					totalDropsLeft === 1 ? "" : "s"
-				} remaining across ${chalk.green(String(appsWithDrops.length))} app${
-					appsWithDrops.length === 1 ? "" : "s"
-				} on page ${this.page}`,
+				`${chalk.green(`Page ${page}`)}: ${chalk.green(
+					String(pageDrops),
+				)} card drop${pageDrops === 1 ? "" : "s"} remaining across ${chalk.green(
+					String(pageApps),
+				)} app${pageApps === 1 ? "" : "s"}`,
 			);
+		} else {
+			this.log(`${chalk.green(`Page ${page}`)}: no drops remaining`);
+		}
 
-			const { requiresIdling, appsToPlay } = this.getAppsToPlay(appsWithDrops);
-			const appids = appsToPlay.map(({ appid }) => appid);
+		const lastPage = parseInt($(".pagelink").last().text(), 10) || 1;
 
-			this.idling = true;
-			this.client.gamesPlayed(appids);
-
-			if (requiresIdling) {
-				// take the median time until minimum playtime is reached and then check the badges again
-				const medianPlaytime = appsToPlay[Math.floor(appsToPlay.length / 2)];
-
-				// have to idle for at least 6 minutes because of rounded hours on badges page
-				const idleTime = Math.max(6, MIN_PLAYTIME_TO_IDLE - medianPlaytime.playtime);
-
-				this.log(`Idling ${chalk.green(String(appsToPlay.length))} apps for ${chalk.green(String(idleTime))} minutes`);
-
-				this.checkTimer = setTimeout(
-					async () => {
-						this.idling = false;
-
-						this.client.gamesPlayed([]);
-
-						this.checkCardsInSeconds(1);
-					},
-					1000 * 60 * idleTime,
-				);
-
-				return;
-			}
-
-			// cycle all apps one by one after 5 minutes of idling them all
-			this.checkTimer = setTimeout(
-				async () => {
-					this.idling = false;
-
-					await this.cycleApps(appids);
-
-					this.checkCardsInSeconds(0);
-				},
-				1000 * 60 * 5,
-			);
-		} else if (this.page <= (parseInt($(".pagelink").last().text(), 10) || 1)) {
-			this.log(chalk.green(`No drops remaining on page ${this.page}`));
-			this.page += 1;
-			this.log(`Checking page ${this.page}...`);
-			this.checkCardsInSeconds(0);
-		} else if (this.page > 1 && this.resetToFirstPage) {
-			this.log(chalk.green("All pages checked, resetting to page 1 and checking again"));
-			this.resetToFirstPage = false;
-			this.page = 1;
-			this.checkCardsInSeconds(0);
+		if (page <= lastPage) {
+			this.requestBadgesPage(page + 1);
+		} else if (this.appsWithDrops.length > 0) {
+			this.idle();
 		} else {
 			this.log(chalk.green("All card drops received!"));
 			this.shutdown(0);
 		}
 	}
 
-	/**
-	 * @param {{appid: number, playtime: number, drops: number}[]} appsWithDrops
-	 */
-	getAppsToPlay(appsWithDrops) {
+	idle() {
+		if (this.playStateBlocked) {
+			this.log(chalk.red("Play state is blocked, unable to idle."));
+			return;
+		}
+
+		const totalDropsLeft = this.appsWithDrops.reduce((total, { drops }) => total + drops, 0);
+
+		this.log(
+			`${chalk.green(String(totalDropsLeft))} card drop${
+				totalDropsLeft === 1 ? "" : "s"
+			} remaining across ${chalk.green(String(this.appsWithDrops.length))} app${
+				this.appsWithDrops.length === 1 ? "" : "s"
+			}`,
+		);
+
+		const { requiresIdling, appsToPlay } = this.getAppsToPlay();
+		const appids = appsToPlay.map(({ appid }) => appid);
+
+		this.idling = true;
+		this.client.gamesPlayed(appids);
+
+		let idleMinutes = 5;
+
+		if (requiresIdling) {
+			// take the median time until minimum playtime is reached and then check again
+			const medianPlaytime = appsToPlay[Math.floor(appsToPlay.length / 2)];
+			idleMinutes = Math.max(1, MIN_PLAYTIME_TO_IDLE - medianPlaytime.playtime);
+		}
+
+		this.log(
+			`Idling ${chalk.green(String(appsToPlay.length))} apps for ${chalk.green(String(idleMinutes))} minutes (${appids.join(", ")})`,
+		);
+
+		this.checkTimer = setTimeout(
+			async () => {
+				this.idling = false;
+
+				for (const app of appsToPlay) {
+					app.playtime += idleMinutes;
+				}
+
+				if (requiresIdling) {
+					this.client.gamesPlayed([]);
+				} else {
+					await this.cycleApps(appids);
+				}
+
+				this.checkTimer = setTimeout(() => {
+					if (this.appsWithDrops.length === 0) {
+						this.log(chalk.green("No drops remaining, checking badges page again."));
+						this.requestBadgesPage(1);
+						return;
+					}
+
+					this.idle();
+				}, 2000);
+			},
+			1000 * 60 * idleMinutes,
+		);
+	}
+
+	getAppsToPlay() {
 		let requiresIdling = false;
-		let appsToPlay = appsWithDrops;
-		const appsUnderMinPlaytime = appsToPlay.filter(({ playtime }) => playtime < MIN_PLAYTIME_TO_IDLE);
+		let appsToPlay = [];
+		const appsUnderMinPlaytime = this.appsWithDrops.filter(({ playtime }) => playtime < MIN_PLAYTIME_TO_IDLE);
 
 		// if more than half of apps require idling, idle them
-		if (appsUnderMinPlaytime.length >= appsToPlay.length / 2) {
+		if (appsUnderMinPlaytime.length >= this.appsWithDrops.length / 2) {
 			this.log(
-				`${chalk.green(String(appsUnderMinPlaytime.length))} out of ${chalk.green(String(appsToPlay.length))} apps require idling`,
+				`${chalk.green(String(appsUnderMinPlaytime.length))} out of ${chalk.green(String(this.appsWithDrops.length))} apps require idling`,
 			);
 
 			// there's more than half of apps to idle, but not enough for the max, add some more
 			if (appsUnderMinPlaytime.length < MAX_APPS_AT_ONCE) {
-				const appsOverMinPlaytime = appsToPlay.filter(({ playtime }) => playtime >= MIN_PLAYTIME_TO_IDLE);
+				const appsOverMinPlaytime = this.appsWithDrops.filter(({ playtime }) => playtime >= MIN_PLAYTIME_TO_IDLE);
 				appsOverMinPlaytime.sort((a, b) => a.playtime - b.playtime);
 
 				// fill up apps to idle up to limit sorted by least playtime
-				const appsToFill = appsOverMinPlaytime.slice(0, MAX_APPS_AT_ONCE - appsUnderMinPlaytime.length);
+				const appsToFill = arrayTakeFirst(appsOverMinPlaytime, MAX_APPS_AT_ONCE - appsUnderMinPlaytime.length);
 				appsUnderMinPlaytime.push(...appsToFill);
 			}
 
 			requiresIdling = true;
 			appsToPlay = appsUnderMinPlaytime;
+		} else {
+			appsToPlay = this.appsWithDrops;
 		}
 
 		appsToPlay.sort((a, b) => b.playtime - a.playtime);
-		appsToPlay = appsToPlay.slice(0, MAX_APPS_AT_ONCE);
+		appsToPlay = arrayTakeFirst(appsToPlay, MAX_APPS_AT_ONCE);
 
 		return { requiresIdling, appsToPlay };
 	}
@@ -367,21 +389,6 @@ class SteamCardFarmer {
 	}
 
 	/**
-	 * @param {Number} seconds
-	 */
-	checkCardsInSeconds(seconds) {
-		clearTimeout(this.checkTimer);
-
-		if (this.playStateBlocked) {
-			return;
-		}
-
-		this.checkTimer = setTimeout(() => {
-			this.requestBadgesPage();
-		}, 1000 * seconds);
-	}
-
-	/**
 	 * @param {String} domain
 	 * @param {Function} callback
 	 */
@@ -408,6 +415,7 @@ class SteamCardFarmer {
 		this.client.on("newItems", this.onNewItems.bind(this));
 		this.client.on("webSession", this.onWebSession.bind(this));
 		this.client.on("steamGuard", this.onSteamGuard.bind(this));
+		this.handleNotifications();
 
 		process.on("SIGINT", () => {
 			this.log("Logging off and shutting down...");
@@ -448,9 +456,13 @@ class SteamCardFarmer {
 	}
 
 	handleNotifications() {
-		const protobuf = ProtobufJS.Root.fromJSON(JSON.parse(readFileSync("./protobuf_steamnotifications.json", "utf8")));
+		const { dirname } = import.meta;
+
+		const protobuf = ProtobufJS.Root.fromJSON(
+			JSON.parse(readFileSync(resolvePath(dirname, "./protobuf_steamnotifications.json"), "utf8")),
+		);
 		const protobufRead = ProtobufJS.Root.fromJSON(
-			JSON.parse(readFileSync("./protobuf_steamnotification_read.json", "utf8")),
+			JSON.parse(readFileSync(resolvePath(dirname, "./protobuf_steamnotification_read.json"), "utf8")),
 		);
 
 		/* eslint-disable no-underscore-dangle */
@@ -460,7 +472,7 @@ class SteamCardFarmer {
 				body,
 			);
 
-			console.log(notifications);
+			console.log(notifications); // eslint-disable-line
 
 			const notificationIdsToRead = [];
 			const newItems = notifications.notifications.filter(
@@ -470,7 +482,21 @@ class SteamCardFarmer {
 
 			for (const notification of newItems) {
 				const item = JSON.parse(notification.body_data);
-				const appid = item.source_appid;
+				const itemSourceAppId = item && item.source_appid;
+				const appIndex = this.appsWithDrops.findIndex(({ appid }) => appid === itemSourceAppId);
+
+				if (!appIndex) {
+					this.log(`Got item drop for app ${itemSourceAppId}, but that is not an app we are idling`);
+					continue;
+				}
+
+				const app = this.appsWithDrops[appIndex];
+				app.drops -= 1;
+				this.log(`Got an item drop for app ${itemSourceAppId}, drops remaining: ${app.drops}`);
+
+				if (app.drops < 1) {
+					this.appsWithDrops.splice(appIndex, 1);
+				}
 
 				notificationIdsToRead.push(notification.notification_id);
 			}
