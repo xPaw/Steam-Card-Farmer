@@ -300,9 +300,9 @@ class SteamCardFarmer {
 					app.playtime += idleMinutes;
 				}
 
-				if (requiresIdling) {
-					this.client.gamesPlayed([]);
-				} else {
+				this.client.gamesPlayed([]);
+
+				if (!requiresIdling) {
 					await this.cycleApps(appids);
 				}
 
@@ -359,12 +359,10 @@ class SteamCardFarmer {
 	async cycleApps(appids) {
 		this.log("Cycling apps...");
 
-		this.client.gamesPlayed([]);
-
 		let current = 0;
 
 		do {
-			await setTimeoutAsync(CYCLE_DELAY); // eslint-disable-line no-await-in-loop
+			await setTimeoutAsync(CYCLE_DELAY);
 
 			if (this.playStateBlocked) {
 				this.log(chalk.red("Play state got blocked while cycling."));
@@ -373,7 +371,7 @@ class SteamCardFarmer {
 
 			this.client.gamesPlayed(appids[current]);
 
-			await setTimeoutAsync(CYCLE_DELAY); // eslint-disable-line no-await-in-loop
+			await setTimeoutAsync(CYCLE_DELAY);
 
 			this.client.gamesPlayed([]);
 
