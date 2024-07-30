@@ -44,8 +44,6 @@ class SteamCardFarmer {
 
 	playStateBlocked = false;
 
-	idling = false;
-
 	/** @type {String[]} */
 	cookies = [];
 
@@ -93,8 +91,6 @@ class SteamCardFarmer {
 	 */
 	onDisconnected(eResult, msg) {
 		clearTimeout(this.checkTimer);
-
-		this.idling = false;
 
 		this.log(chalk.red(`Disconnected: ${msg}`));
 	}
@@ -178,7 +174,7 @@ class SteamCardFarmer {
 				throw new Error(`HTTP error ${response.status}`);
 			}
 		} catch (err) {
-			this.log(chalk.red(`Couldn't request badge page: ${err}`));
+			this.log(chalk.red(`Page ${page}: failed to load: ${err}`));
 
 			this.checkTimer = setTimeout(() => this.requestBadgesPage(page), 30000);
 			return;
@@ -187,7 +183,7 @@ class SteamCardFarmer {
 		const text = await response.text();
 
 		if (text.includes("g_steamID = false")) {
-			this.log(chalk.red("Badge page loaded, but it is logged out."));
+			this.log(chalk.red(`Page ${page}: loaded, but it is logged out`));
 			this.client.webLogOn();
 			return;
 		}
@@ -284,7 +280,6 @@ class SteamCardFarmer {
 		const { requiresIdling, appsToPlay } = this.getAppsToPlay();
 		const appids = appsToPlay.map(({ appid }) => appid);
 
-		this.idling = true;
 		this.client.gamesPlayed(appids);
 
 		let idleMinutes = 5;
@@ -301,8 +296,6 @@ class SteamCardFarmer {
 
 		this.checkTimer = setTimeout(
 			async () => {
-				this.idling = false;
-
 				for (const app of appsToPlay) {
 					app.playtime += idleMinutes;
 				}
