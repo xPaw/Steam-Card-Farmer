@@ -8,6 +8,7 @@ import { promisify } from "util";
 import { readFileSync } from "fs";
 import { resolve as resolvePath } from "path";
 import ProtobufJS from "protobufjs";
+import arg from "arg";
 
 const setTimeoutAsync = promisify(setTimeout);
 
@@ -18,9 +19,9 @@ const setTimeoutAsync = promisify(setTimeout);
 //
 // !!!
 
-const MAX_APPS_AT_ONCE = 32; // how many apps to idle at once
-const MIN_PLAYTIME_TO_IDLE = 180; // minimum playtime in minutes without cycling
-const CYCLE_DELAY = 10000; // how many milliseconds to wait between cycling apps
+let MAX_APPS_AT_ONCE = 32; // how many apps to idle at once
+let MIN_PLAYTIME_TO_IDLE = 180; // minimum playtime in minutes without cycling
+let CYCLE_DELAY = 10000; // how many milliseconds to wait between cycling apps
 
 /**
  * @param {Array} arr
@@ -455,20 +456,44 @@ class SteamCardFarmer {
 			this.shutdown(0);
 		});
 
-		let argsStartIdx = 2;
-		if (process.argv[0] === "steamcardfarmer") {
-			argsStartIdx = 1;
-		}
+		let args;
 
-		if (process.argv.length === argsStartIdx + 2) {
-			this.logOn(process.argv[argsStartIdx], process.argv[argsStartIdx + 1]);
+		try {
+			args = arg({
+				"--username": String,
+				"--password": String,
+				"--concurrent-apps": Number,
+				"--min-playtime": Number,
+				"--cycle-delay": Number,
+
+				"-u": "--username",
+				"-p": "--password",
+			});
+
+			if (args["--concurrent-apps"]) {
+				MAX_APPS_AT_ONCE = args["--concurrent-apps"];
+
+				if (MAX_APPS_AT_ONCE < 1 || MAX_APPS_AT_ONCE) {
+					throw new Error("--concurrent-apps out of range");
+				}
+			}
+
+			if (args["--min-playtime"]) {
+				MIN_PLAYTIME_TO_IDLE = args["--min-playtime"];
+			}
+
+			if (args["--cycle-delay"]) {
+				CYCLE_DELAY = args["--cycle-delay"];
+			}
+		} catch (e) {
+			console.error(e.message); // eslint-disable-line no-console
+			process.exit(1);
 			return;
 		}
 
-		let initialUsername = "";
-
-		if (process.argv.length === argsStartIdx + 1) {
-			initialUsername = process.argv[argsStartIdx];
+		if (args["--username"] && args["--password"]) {
+			this.logOn(args["--username"], args["--password"]);
+			return;
 		}
 
 		const validate = (/** @type string */ input) => input.length > 0;
@@ -479,13 +504,14 @@ class SteamCardFarmer {
 					type: "input",
 					name: "username",
 					message: "Steam username:",
-					initial: initialUsername,
+					initial: args["--username"] || "",
 					validate,
 				},
 				{
 					type: "password",
 					name: "password",
 					message: "Steam password:",
+					initial: args["--password"] || "",
 					validate,
 				},
 			])
