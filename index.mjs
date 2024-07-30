@@ -20,7 +20,7 @@ const setTimeoutAsync = promisify(setTimeout);
 
 const MAX_APPS_AT_ONCE = 32; // how many apps to idle at once
 const MIN_PLAYTIME_TO_IDLE = 180; // minimum playtime in minutes without cycling
-const CYCLE_DELAY = 1000; // how many milliseconds to wait between cycling apps
+const CYCLE_DELAY = 10000; // how many milliseconds to wait between cycling apps
 
 /**
  * @param {Array} arr
@@ -34,6 +34,21 @@ function arrayTakeFirst(arr, end) {
 	}
 
 	return result;
+}
+
+/**
+ * @param {Array} array
+ */
+function arrayShuffle(array) {
+	let currentIndex = array.length;
+
+	while (currentIndex !== 0) {
+		const randomIndex = Math.floor(Math.random() * currentIndex);
+		currentIndex -= 1;
+
+		// eslint-disable-next-line no-param-reassign
+		[array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+	}
 }
 
 class SteamCardFarmer {
@@ -340,7 +355,7 @@ class SteamCardFarmer {
 					}
 
 					this.idle();
-				}, 2000);
+				}, CYCLE_DELAY);
 			},
 			1000 * 60 * idleMinutes,
 		);
@@ -376,6 +391,8 @@ class SteamCardFarmer {
 		appsToPlay.sort((a, b) => b.playtime - a.playtime);
 		appsToPlay = arrayTakeFirst(appsToPlay, MAX_APPS_AT_ONCE);
 
+		arrayShuffle(appsToPlay);
+
 		return { requiresIdling, appsToPlay };
 	}
 
@@ -397,12 +414,12 @@ class SteamCardFarmer {
 
 			this.client.gamesPlayed(appids[current]);
 
-			await setTimeoutAsync(CYCLE_DELAY);
-
-			this.client.gamesPlayed([]);
-
 			current += 1;
 		} while (current < appids.length);
+
+		await setTimeoutAsync(CYCLE_DELAY);
+
+		this.client.gamesPlayed([]);
 	}
 
 	/**
