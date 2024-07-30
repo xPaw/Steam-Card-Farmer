@@ -465,6 +465,12 @@ class SteamCardFarmer {
 			return;
 		}
 
+		let initialUsername = "";
+
+		if (process.argv.length === argsStartIdx + 1) {
+			initialUsername = process.argv[argsStartIdx];
+		}
+
 		const validate = (/** @type string */ input) => input.length > 0;
 
 		enquirer
@@ -473,6 +479,7 @@ class SteamCardFarmer {
 					type: "input",
 					name: "username",
 					message: "Steam username:",
+					initial: initialUsername,
 					validate,
 				},
 				{
