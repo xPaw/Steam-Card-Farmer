@@ -11,6 +11,9 @@ This script will idle all cards for all your games by playing up to 32 games at 
 
 ### Usage
 
+> [!IMPORTANT]
+> [The "I receive a new item in my inventory" notification type must be enabled](https://store.steampowered.com/account/notificationsettings)
+
 On the command line, just type `npm start`. Optionally include your username and password as arguments, as such: `npm start steamusername steampassword`.
 
 If not provided on the command line, it'll prompt you for your Steam username and password.

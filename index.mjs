@@ -5,8 +5,17 @@ import chalk from "ansi-colors";
 import enquirer from "enquirer";
 import { load as cheerio } from "cheerio";
 import { promisify } from "util";
+import { readFileSync } from "fs";
+import ProtobufJS from "protobufjs";
 
 const setTimeoutAsync = promisify(setTimeout);
+
+// !!!
+//
+// "I receive a new item in my inventory" notification must be enabled
+// https://store.steampowered.com/account/notificationsettings
+//
+// !!!
 
 const MAX_APPS_AT_ONCE = 32; // how many apps to idle at once
 const MIN_PLAYTIME_TO_IDLE = 180; // minimum playtime in minutes without cycling
@@ -107,7 +116,7 @@ class SteamCardFarmer {
 			return;
 		}
 
-		this.log(chalk.green(`Got notification of new inventory items: ${count} new item${count === 1 ? "" : "s"}`));
+		this.log(chalk.green(`Got ${count} new item${count === 1 ? "" : "s"}`));
 
 		if (this.idling) {
 			this.checkCardsInSeconds(2);
@@ -436,6 +445,50 @@ class SteamCardFarmer {
 				this.logOn(result.username, result.password),
 			)
 			.catch(console.error); // eslint-disable-line no-console
+	}
+
+	handleNotifications() {
+		const protobuf = ProtobufJS.Root.fromJSON(JSON.parse(readFileSync("./protobuf_steamnotifications.json", "utf8")));
+		const protobufRead = ProtobufJS.Root.fromJSON(
+			JSON.parse(readFileSync("./protobuf_steamnotification_read.json", "utf8")),
+		);
+
+		/* eslint-disable no-underscore-dangle */
+		this.client._handlerManager.add("SteamNotificationClient.NotificationsReceived#1", (body) => {
+			const notifications = SteamUser._decodeProto(
+				protobuf.CSteamNotification_NotificationsReceived_Notification,
+				body,
+			);
+
+			console.log(notifications);
+
+			const notificationIdsToRead = [];
+			const newItems = notifications.notifications.filter(
+				(notification) =>
+					notification.notification_type === protobuf.ESteamNotificationType.k_ESteamNotificationType_Item,
+			);
+
+			for (const notification of newItems) {
+				const item = JSON.parse(notification.body_data);
+				const appid = item.source_appid;
+
+				notificationIdsToRead.push(notification.notification_id);
+			}
+
+			if (notificationIdsToRead.length > 0) {
+				this.client._send(
+					{
+						msg: 151, // EMsg.ServiceMethodCallFromClient
+						proto: {
+							target_job_name: "SteamNotification.MarkNotificationsRead#1",
+						},
+					},
+					protobufRead.CSteamNotification_MarkNotificationsRead_Notification.encode({
+						notification_ids: notificationIdsToRead,
+					}).finish(),
+				);
+			}
+		});
 	}
 
 	/**

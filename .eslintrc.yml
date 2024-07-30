@@ -8,3 +8,6 @@ parserOptions:
 
 env:
   node: true
+
+rules:
+  no-restricted-syntax: off
