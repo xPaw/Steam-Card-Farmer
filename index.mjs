@@ -485,7 +485,7 @@ class SteamCardFarmer {
 				const itemSourceAppId = item && item.source_appid;
 				const appIndex = this.appsWithDrops.findIndex(({ appid }) => appid === itemSourceAppId);
 
-				if (!appIndex) {
+				if (appIndex < 0) {
 					this.log(`Got item drop for app ${itemSourceAppId}, but that is not an app we are idling`);
 					continue;
 				}
