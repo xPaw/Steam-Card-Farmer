@@ -192,6 +192,8 @@ class SteamCardFarmer {
 		let pageApps = 0;
 		const $ = cheerio(text);
 
+		const seenAppIds = new Set(this.appsWithDrops.map(({ appid }) => appid));
+
 		$(".progress_info_bold").each((index, infoline) => {
 			const match = $(infoline).text().match(/(\d+)/);
 
@@ -210,7 +212,7 @@ class SteamCardFarmer {
 			const appid = parseInt(urlparts[urlparts.length - 1], 10) || 0;
 			const drops = parseInt(match[1], 10) || 0;
 
-			if (appid < 1 || drops < 1) {
+			if (appid < 1 || drops < 1 || seenAppIds.has(appid)) {
 				return;
 			}
 
@@ -235,6 +237,7 @@ class SteamCardFarmer {
 			};
 
 			this.appsWithDrops.push(appObj);
+			seenAppIds.add(appid);
 		});
 
 		if (pageDrops > 0) {
@@ -269,7 +272,9 @@ class SteamCardFarmer {
 
 		const totalDropsLeft = this.appsWithDrops.reduce((total, { drops }) => total + drops, 0);
 
-		const { requiresIdling, appsToPlay } = this.getAppsToPlay();
+		const temp = this.getAppsToPlay();
+		let { requiresIdling } = temp;
+		const { appsToPlay } = temp;
 		const appids = appsToPlay.map(({ appid }) => appid);
 
 		this.client.gamesPlayed(appids);
@@ -279,16 +284,25 @@ class SteamCardFarmer {
 		if (requiresIdling) {
 			// take the median time until minimum playtime is reached and then check again
 			const medianPlaytime = appsToPlay[Math.floor(appsToPlay.length / 2)];
-			idleMinutes = Math.max(1, MIN_PLAYTIME_TO_IDLE - medianPlaytime.playtime);
+			idleMinutes = MIN_PLAYTIME_TO_IDLE - medianPlaytime.playtime;
 
+			if (idleMinutes < 5) {
+				requiresIdling = false;
+				idleMinutes = 5;
+			}
+		}
+
+		if (requiresIdling) {
 			this.log(
-				`Idling ${chalk.green(String(appsToPlay.length))} apps for ${chalk.green(String(idleMinutes))} minutes - for playtime`,
+				`Idling ${chalk.green(String(appsToPlay.length))} app${
+					appsToPlay.length === 1 ? "" : "s"
+				} for ${chalk.green(String(idleMinutes))} minutes - for playtime`,
 			);
 		} else {
 			this.log(
-				`Idling ${chalk.green(String(appsToPlay.length))} apps for ${chalk.green(String(idleMinutes))} minutes - ${chalk.green(
-					String(totalDropsLeft),
-				)} card drop${
+				`Idling ${chalk.green(String(appsToPlay.length))} app${
+					appsToPlay.length === 1 ? "" : "s"
+				} for ${chalk.green(String(idleMinutes))} minutes - ${chalk.green(String(totalDropsLeft))} card drop${
 					totalDropsLeft === 1 ? "" : "s"
 				} remaining across ${chalk.green(String(this.appsWithDrops.length))} app${
 					this.appsWithDrops.length === 1 ? "" : "s"
@@ -474,8 +488,8 @@ class SteamCardFarmer {
 			for (const notification of newItems) {
 				const item = JSON.parse(notification.body_data);
 
+				// eslint-disable-next-line eqeqeq
 				if (!item || item.app_id != 753 || item.context_id != 6) {
-					// eslint-disable-line eqeqeq
 					continue;
 				}
 
