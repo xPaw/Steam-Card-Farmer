@@ -495,6 +495,10 @@ class SteamCardFarmer {
 			);
 
 			for (const notification of newItems) {
+				if (notification.read || notification.viewed > 0) {
+					continue;
+				}
+
 				const item = JSON.parse(notification.body_data);
 
 				// eslint-disable-next-line eqeqeq
