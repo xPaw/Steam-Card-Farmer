@@ -118,19 +118,6 @@ class SteamCardFarmer {
 	}
 
 	/**
-	 * @param {Number} count
-	 */
-	onNewItems(count) {
-		if (count === 0) {
-			return;
-		}
-
-		this.log(chalk.green(`Got ${count} new item${count === 1 ? "" : "s"}`));
-
-		// TODO: If reaching 100 request inventory page to reset the counter?
-	}
-
-	/**
 	 * @param {String} sessionID
 	 * @param {String[]} cookies
 	 */
@@ -442,7 +429,6 @@ class SteamCardFarmer {
 		this.client.on("error", this.onError.bind(this));
 		this.client.on("disconnected", this.onDisconnected.bind(this));
 		this.client.on("playingState", this.onPlayingState.bind(this));
-		this.client.on("newItems", this.onNewItems.bind(this));
 		this.client.on("webSession", this.onWebSession.bind(this));
 		this.client.on("steamGuard", this.onSteamGuard.bind(this));
 		this.handleNotifications();
