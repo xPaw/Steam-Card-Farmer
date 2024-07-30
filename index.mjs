@@ -40,12 +40,14 @@ class SteamCardFarmer {
 	/** @type {{appid: number, playtime: number, drops: number}[]} */
 	appsWithDrops = [];
 
+	/** @type {String[]} */
+	cookies = [];
+
 	checkTimer = null;
 
 	playStateBlocked = false;
 
-	/** @type {String[]} */
-	cookies = [];
+	lastBadgesCheck = Date.now();
 
 	client = new SteamUser();
 
@@ -138,6 +140,7 @@ class SteamCardFarmer {
 
 		clearTimeout(this.checkTimer);
 		this.checkTimer = setTimeout(() => {
+			this.log(`Web session received, checking badges...`);
 			this.appsWithDrops = [];
 			this.requestBadgesPage(1);
 		}, 1000 * 2);
@@ -145,10 +148,9 @@ class SteamCardFarmer {
 
 	/**
 	 * @param {Number} page
+	 * @param {Boolean} syncOnly
 	 */
-	async requestBadgesPage(page) {
-		this.log(`${chalk.green(`Page ${page}`)}: checking...`);
-
+	async requestBadgesPage(page, syncOnly = false) {
 		let url = "";
 
 		if (this.client.vanityURL) {
@@ -176,7 +178,7 @@ class SteamCardFarmer {
 		} catch (err) {
 			this.log(chalk.red(`Page ${page}: failed to load: ${err}`));
 
-			this.checkTimer = setTimeout(() => this.requestBadgesPage(page), 30000);
+			this.checkTimer = setTimeout(() => this.requestBadgesPage(page, syncOnly), 30000);
 			return;
 		}
 
@@ -190,9 +192,12 @@ class SteamCardFarmer {
 
 		let pageDrops = 0;
 		let pageApps = 0;
+		const appIdToApp = new Map();
 		const $ = cheerio(text);
 
-		const seenAppIds = new Set(this.appsWithDrops.map(({ appid }) => appid));
+		for (let i = 0; i < this.appsWithDrops.length; i += 1) {
+			appIdToApp.set(this.appsWithDrops[i].appid, i);
+		}
 
 		$(".progress_info_bold").each((index, infoline) => {
 			const match = $(infoline).text().match(/(\d+)/);
@@ -212,7 +217,7 @@ class SteamCardFarmer {
 			const appid = parseInt(urlparts[urlparts.length - 1], 10) || 0;
 			const drops = parseInt(match[1], 10) || 0;
 
-			if (appid < 1 || drops < 1 || seenAppIds.has(appid)) {
+			if (appid < 1 || drops < 1) {
 				return;
 			}
 
@@ -230,14 +235,23 @@ class SteamCardFarmer {
 				playtime = Math.round(playtime * 60);
 			}
 
-			const appObj = {
+			const app = {
 				appid,
 				playtime,
 				drops,
 			};
 
-			this.appsWithDrops.push(appObj);
-			seenAppIds.add(appid);
+			const existingAppIndex = appIdToApp.get(appid);
+
+			if (typeof existingAppIndex !== "undefined") {
+				const existingApp = this.appsWithDrops[existingAppIndex];
+				existingApp.drops = drops;
+				existingApp.playtime = playtime;
+				return;
+			}
+
+			this.appsWithDrops.push(app);
+			appIdToApp.set(appid, app);
 		});
 
 		if (pageDrops > 0) {
@@ -255,13 +269,17 @@ class SteamCardFarmer {
 		const lastPage = parseInt($(".pagelink").last().text(), 10) || 1;
 
 		if (page <= lastPage) {
-			this.requestBadgesPage(page + 1);
+			this.requestBadgesPage(page + 1, syncOnly);
+		} else if (syncOnly) {
+			// do nothing
 		} else if (this.appsWithDrops.length > 0) {
 			this.idle();
 		} else {
 			this.log(chalk.green("All card drops received!"));
 			this.shutdown(0);
 		}
+
+		this.lastBadgesCheck = Date.now();
 	}
 
 	idle() {
@@ -327,6 +345,11 @@ class SteamCardFarmer {
 						this.log(chalk.green("No drops remaining, checking badges page again."));
 						this.requestBadgesPage(1);
 						return;
+					}
+
+					// background sync of badges every 3 hours
+					if (Date.now() - this.lastBadgesCheck >= 1000 * 60 * 180) {
+						this.requestBadgesPage(1, true);
 					}
 
 					this.idle();
