@@ -338,9 +338,9 @@ class SteamCardFarmer {
 				}
 
 				if (requiresIdling) {
-					await this.cycleApps(appids);
-				} else {
 					this.client.gamesPlayed([]);
+				} else {
+					await this.cycleApps(appids);
 				}
 
 				this.checkTimer = setTimeout(() => {
