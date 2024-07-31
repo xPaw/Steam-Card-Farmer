@@ -3,7 +3,7 @@
 import SteamUser from "steam-user";
 import chalk from "ansi-colors";
 import enquirer from "enquirer";
-import { load as cheerio } from "cheerio";
+import { JSDOM } from "jsdom";
 import { promisify } from "util";
 import { readFileSync, existsSync as fileExists } from "fs";
 import { writeFile, readFile, unlink as unlinkFile } from "fs/promises";
@@ -224,21 +224,22 @@ class SteamCardFarmer {
 		let pageDrops = 0;
 		let pageApps = 0;
 		const appIdToApp = new Map();
-		const $ = cheerio(text);
+		const dom = new JSDOM(text);
+		const { document } = dom.window;
 
 		for (let i = 0; i < this.appsWithDrops.length; i += 1) {
 			appIdToApp.set(this.appsWithDrops[i].appid, i);
 		}
 
-		$(".progress_info_bold").each((index, infoline) => {
-			const match = $(infoline).text().match(/(\d+)/);
+		document.querySelectorAll(".progress_info_bold").forEach((infoline) => {
+			const match = infoline.textContent.match(/(\d+)/);
 
 			if (!match) {
 				return;
 			}
 
-			const row = $(infoline).closest(".badge_row");
-			const href = row.find(".badge_title_playgame a").attr("href");
+			const row = infoline.closest(".badge_row");
+			const href = row.querySelector(".badge_title_playgame a").getAttribute("href");
 
 			if (!href) {
 				return;
@@ -256,10 +257,7 @@ class SteamCardFarmer {
 			pageApps += 1;
 
 			let playtime = 0.0;
-			const playTimeMatch = row
-				.find(".badge_title_stats_playtime")
-				.text()
-				.match(/(?<playtime>\d+\.\d+)/);
+			const playTimeMatch = row.querySelector(".badge_title_stats_playtime").textContent.match(/(?<playtime>\d+\.\d+)/);
 
 			if (playTimeMatch) {
 				playtime = parseFloat(playTimeMatch.groups.playtime) || 0.0;
@@ -297,7 +295,12 @@ class SteamCardFarmer {
 			this.log(`${chalk.green(`Page ${page}`)}: no drops remaining`);
 		}
 
-		const lastPage = parseInt($(".pagelink").last().text(), 10) || 1;
+		let lastPage = 0;
+		const pageLinks = document.querySelectorAll(".pagelink");
+
+		if (pageLinks.length > 0) {
+			lastPage = parseInt(pageLinks[pageLinks.length - 1].textContent, 10) || 1;
+		}
 
 		if (page <= lastPage) {
 			this.requestBadgesPage(page + 1, syncOnly);

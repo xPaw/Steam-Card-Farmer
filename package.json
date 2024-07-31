@@ -18,8 +18,8 @@
 	"dependencies": {
 		"ansi-colors": "^4.1.3",
 		"arg": "^5.0.2",
-		"cheerio": "^1.0.0-rc.12",
 		"enquirer": "^2.4.1",
+		"jsdom": "^24.1.1",
 		"protobufjs": "^7.3.2",
 		"steam-user": "^5.0.1"
 	},
