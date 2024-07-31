@@ -467,7 +467,7 @@ class SteamCardFarmer {
 				"-p": "--password",
 			});
 
-			if (args["--concurrent-apps"]) {
+			if (typeof args["--concurrent-apps"] !== "undefined") {
 				MAX_APPS_AT_ONCE = args["--concurrent-apps"];
 
 				if (MAX_APPS_AT_ONCE < 1 || MAX_APPS_AT_ONCE) {
@@ -475,11 +475,11 @@ class SteamCardFarmer {
 				}
 			}
 
-			if (args["--min-playtime"]) {
+			if (typeof args["--min-playtime"] !== "undefined") {
 				MIN_PLAYTIME_TO_IDLE = args["--min-playtime"];
 			}
 
-			if (args["--cycle-delay"]) {
+			if (typeof args["--cycle-delay"] !== "undefined") {
 				CYCLE_DELAY = args["--cycle-delay"];
 			}
 		} catch (e) {
