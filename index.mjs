@@ -6,7 +6,7 @@ import enquirer from "enquirer";
 import { load as cheerio } from "cheerio";
 import { promisify } from "util";
 import { readFileSync, existsSync as fileExists } from "fs";
-import { writeFile, readFile } from "fs/promises";
+import { writeFile, readFile, unlink as unlinkFile } from "fs/promises";
 import { resolve as resolvePath } from "path";
 import ProtobufJS from "protobufjs";
 import arg from "arg";
@@ -104,7 +104,7 @@ class SteamCardFarmer {
 	/**
 	 * @param {Error & ({eresult: SteamUser.EResult})} e
 	 */
-	onError(e) {
+	async onError(e) {
 		clearTimeout(this.checkTimer);
 
 		if (e.eresult === SteamUser.EResult.LoggedInElsewhere) {
@@ -115,6 +115,19 @@ class SteamCardFarmer {
 			setTimeout(() => this.client.logOn(true), 1000);
 
 			return;
+		}
+
+		const badTokenErrors =
+		[
+			SteamUser.EResult.AccessDenied,
+			SteamUser.EResult.Expired,
+			SteamUser.EResult.InvalidPassword,
+			SteamUser.EResult.InvalidSignature,
+			SteamUser.EResult.Revoked,
+		];
+
+		if (badTokenErrors.includes(e.eresult) ) {
+			await unlinkFile(this.getRefreshTokenFilename());
 		}
 
 		this.log(chalk.red(e.toString()));
