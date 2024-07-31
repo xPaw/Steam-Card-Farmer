@@ -83,7 +83,6 @@ class SteamCardFarmer {
 			accountName: refreshToken ? null : this.accountName,
 			password,
 			refreshToken,
-			renewRefreshTokens: true,
 			machineName: "Steam-Card-Farmer",
 			logonID: 66666666,
 		});
