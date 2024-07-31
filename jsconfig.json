@@ -6,7 +6,5 @@
 		"module": "esnext",
 		"target": "esnext"
 	},
-	"include": [
-		"index.mjs"
-	],
+	"include": ["index.mjs"]
 }

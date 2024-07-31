@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 
-import SteamUser from "steam-user";
+import { existsSync as fileExists, readFileSync } from "node:fs";
+import { readFile, unlink as unlinkFile, writeFile } from "node:fs/promises";
+import { resolve as resolvePath } from "node:path";
+import { promisify } from "node:util";
 import chalk from "ansi-colors";
+import arg from "arg";
 import enquirer from "enquirer";
 import { JSDOM } from "jsdom";
-import { promisify } from "util";
-import { readFileSync, existsSync as fileExists } from "fs";
-import { writeFile, readFile, unlink as unlinkFile } from "fs/promises";
-import { resolve as resolvePath } from "path";
 import ProtobufJS from "protobufjs";
-import arg from "arg";
+import SteamUser from "steam-user";
 
 const setTimeoutAsync = promisify(setTimeout);
 const { dirname } = import.meta;
@@ -49,7 +49,6 @@ function arrayShuffle(array) {
 		const randomIndex = Math.floor(Math.random() * currentIndex);
 		currentIndex -= 1;
 
-		// eslint-disable-next-line no-param-reassign
 		[array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
 	}
 }
@@ -171,7 +170,7 @@ class SteamCardFarmer {
 
 		clearTimeout(this.checkTimer);
 		this.checkTimer = setTimeout(() => {
-			this.log(`Web session received, checking badges...`);
+			this.log("Web session received, checking badges...");
 			this.appsWithDrops = [];
 			this.requestBadgesPage(1);
 		}, 1000 * 2);
@@ -190,14 +189,14 @@ class SteamCardFarmer {
 			url = `profiles/${this.client.steamID.getSteamID64()}`;
 		}
 
-		let response;
+		let document;
 
 		try {
 			const headers = new Headers();
 			headers.append("User-Agent", "Steam-Card-Farmer (+https://github.com/xPaw/Steam-Card-Farmer)");
 			headers.append("Cookie", this.cookies.join("; "));
 
-			response = await fetch(`https://steamcommunity.com/${url}/badges/?l=english&p=${page}`, {
+			const response = await fetch(`https://steamcommunity.com/${url}/badges/?l=english&p=${page}`, {
 				headers,
 				redirect: "error",
 				signal: AbortSignal.timeout(10000),
@@ -206,6 +205,17 @@ class SteamCardFarmer {
 			if (response.status !== 200) {
 				throw new Error(`HTTP error ${response.status}`);
 			}
+
+			const text = await response.text();
+
+			if (text.includes("g_steamID = false")) {
+				this.log(chalk.red(`Page ${page}: loaded, but it is logged out`));
+				this.client.webLogOn();
+				return;
+			}
+
+			const dom = new JSDOM(text);
+			document = dom.window.document;
 		} catch (err) {
 			this.log(chalk.red(`Page ${page}: failed to load: ${err}`));
 
@@ -213,54 +223,46 @@ class SteamCardFarmer {
 			return;
 		}
 
-		const text = await response.text();
-
-		if (text.includes("g_steamID = false")) {
-			this.log(chalk.red(`Page ${page}: loaded, but it is logged out`));
-			this.client.webLogOn();
-			return;
-		}
-
 		let pageDrops = 0;
 		let pageApps = 0;
 		const appIdToApp = new Map();
-		const dom = new JSDOM(text);
-		const { document } = dom.window;
 
 		for (let i = 0; i < this.appsWithDrops.length; i += 1) {
 			appIdToApp.set(this.appsWithDrops[i].appid, i);
 		}
 
-		document.querySelectorAll(".progress_info_bold").forEach((infoline) => {
+		for (const infoline of document.querySelectorAll(".progress_info_bold")) {
 			const match = infoline.textContent.match(/(\d+)/);
 
 			if (!match) {
-				return;
+				continue;
 			}
 
 			const row = infoline.closest(".badge_row");
 			const href = row.querySelector(".badge_title_playgame a").getAttribute("href");
 
 			if (!href) {
-				return;
+				continue;
 			}
 
 			const urlparts = href.split("/");
-			const appid = parseInt(urlparts[urlparts.length - 1], 10) || 0;
-			const drops = parseInt(match[1], 10) || 0;
+			const appid = Number.parseInt(urlparts[urlparts.length - 1], 10) || 0;
+			const drops = Number.parseInt(match[1], 10) || 0;
 
 			if (appid < 1 || drops < 1) {
-				return;
+				continue;
 			}
 
 			pageDrops += drops;
 			pageApps += 1;
 
 			let playtime = 0.0;
-			const playTimeMatch = row.querySelector(".badge_title_stats_playtime").textContent.match(/(?<playtime>\d+\.\d+)/);
+			const playTimeMatch = row
+				.querySelector(".badge_title_stats_playtime")
+				.textContent.match(/(?<playtime>\d+\.\d+)/);
 
 			if (playTimeMatch) {
-				playtime = parseFloat(playTimeMatch.groups.playtime) || 0.0;
+				playtime = Number.parseFloat(playTimeMatch.groups.playtime) || 0.0;
 				playtime = Math.round(playtime * 60);
 			}
 
@@ -276,12 +278,12 @@ class SteamCardFarmer {
 				const existingApp = this.appsWithDrops[existingAppIndex];
 				existingApp.drops = drops;
 				existingApp.playtime = playtime;
-				return;
+				continue;
 			}
 
 			this.appsWithDrops.push(app);
 			appIdToApp.set(appid, app);
-		});
+		}
 
 		if (pageDrops > 0) {
 			this.log(
@@ -299,7 +301,7 @@ class SteamCardFarmer {
 		const pageLinks = document.querySelectorAll(".pagelink");
 
 		if (pageLinks.length > 0) {
-			lastPage = parseInt(pageLinks[pageLinks.length - 1].textContent, 10) || 1;
+			lastPage = Number.parseInt(pageLinks[pageLinks.length - 1].textContent, 10) || 1;
 		}
 
 		if (page <= lastPage) {
@@ -411,7 +413,9 @@ class SteamCardFarmer {
 
 			// there's more than half of apps to idle, but not enough for the max, add some more
 			if (appsUnderMinPlaytime.length < MAX_APPS_AT_ONCE) {
-				const appsOverMinPlaytime = this.appsWithDrops.filter(({ playtime }) => playtime >= MIN_PLAYTIME_TO_IDLE);
+				const appsOverMinPlaytime = this.appsWithDrops.filter(
+					({ playtime }) => playtime >= MIN_PLAYTIME_TO_IDLE,
+				);
 				appsOverMinPlaytime.sort((a, b) => a.playtime - b.playtime);
 
 				// fill up apps to idle up to limit sorted by least playtime
@@ -460,7 +464,6 @@ class SteamCardFarmer {
 	 * @param {String} domain
 	 * @param {Function} callback
 	 */
-	// eslint-disable-next-line class-methods-use-this
 	onSteamGuard(domain, callback) {
 		enquirer
 			.prompt([
@@ -472,7 +475,7 @@ class SteamCardFarmer {
 				},
 			])
 			.then((/** @type {{code: String}} */ result) => callback(result.code))
-			.catch(console.error); // eslint-disable-line no-console
+			.catch(console.error);
 	}
 
 	async init() {
@@ -520,7 +523,7 @@ class SteamCardFarmer {
 				CYCLE_DELAY = args["--cycle-delay"];
 			}
 		} catch (e) {
-			console.error(e.message); // eslint-disable-line no-console
+			console.error(e.message);
 			process.exit(1);
 			return;
 		}
@@ -575,7 +578,6 @@ class SteamCardFarmer {
 			JSON.parse(readFileSync(resolvePath(dirname, "./protobuf_steamnotification_read.json"), "utf8")),
 		);
 
-		/* eslint-disable no-underscore-dangle */
 		this.client._handlerManager.add("SteamNotificationClient.NotificationsReceived#1", (body) => {
 			const notifications = SteamUser._decodeProto(
 				protobuf.CSteamNotification_NotificationsReceived_Notification,
@@ -595,8 +597,7 @@ class SteamCardFarmer {
 
 				const item = JSON.parse(notification.body_data);
 
-				// eslint-disable-next-line eqeqeq
-				if (!item || item.app_id != 753 || item.context_id != 6) {
+				if (!item || String(item.app_id) !== "753" || String(item.context_id) !== "6") {
 					continue;
 				}
 
@@ -659,13 +660,11 @@ class SteamCardFarmer {
 	/**
 	 * @param {String} message
 	 */
-	// eslint-disable-next-line class-methods-use-this
 	log(message) {
 		const date = new Date();
 		const isoDateTime = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
 		const formatted = `[${isoDateTime.toISOString().split(".")[0].replace("T", " ")}]`;
 
-		// eslint-disable-next-line no-console
 		console.log(`${chalk.cyan(formatted)} ${message}`);
 	}
 }
