@@ -14,15 +14,21 @@ This script will idle all cards for all your games by playing up to 32 games at 
 > [!IMPORTANT]
 > [The "I receive a new item in my inventory" notification type must be enabled](https://store.steampowered.com/account/notificationsettings)
 
-On the command line, just type `npm start`.
+> [!DANGER]
+> If you have purchased a game in the past 14 days, **idling it will waive your right to a refund on Steam**.
 
-If you have purchased a game in the past 14 days, **idling it will waive your right to a refund on Steam**.
+On the command line, just type `npm start` or `node index.mjs`.
 
 If you want to play a game while idler is running, press **Continue Launch** in Steam, and idler will wait until you finish playing to resume idling. You do not need to shut down the idler.
 
-#### Optional arguments
+### Arguments
 
-For example: `npm start -- --username hello --min-playtime 120`
+If no arguments are provided, it will ask for username and password interactively.
+Once logged in, it will store the refresh token in data folder, which will not ask for your password again.
+
+If the token was already stored, you can skip the interaction by passing username as an argument.
+
+For example: `node index.mjs -u hello --min-playtime 120`
 
 Name | Description
 ---- | -----------
@@ -31,6 +37,8 @@ Name | Description
 `--concurrent-apps` | how many apps to idle at once
 `--min-playtime` | minimum playtime in minutes without cycling
 `--cycle-delay` | how many milliseconds to wait between cycling apps
+
+Use `--min-playtime 0` if your account is not limited due to refunds and you get card drops from zero minutes of playtime.
 
 ### License
 
