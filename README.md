@@ -14,7 +14,7 @@ This script will idle all cards for all your games by playing up to 32 games at 
 > [!IMPORTANT]
 > [The "I receive a new item in my inventory" notification type must be enabled](https://store.steampowered.com/account/notificationsettings)
 
-> [!DANGER]
+> [!CAUTION]
 > If you have purchased a game in the past 14 days, **idling it will waive your right to a refund on Steam**.
 
 On the command line, just type `npm start` or `node index.mjs`.
