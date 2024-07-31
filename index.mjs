@@ -98,7 +98,7 @@ class SteamCardFarmer {
 	 * @param {String} token
 	 */
 	async onRefreshToken(token) {
-		await writeFile(this.getRefreshTokenFilename(), token, 'utf8');
+		await writeFile(this.getRefreshTokenFilename(), token, "utf8");
 	}
 
 	/**
@@ -117,8 +117,7 @@ class SteamCardFarmer {
 			return;
 		}
 
-		const badTokenErrors =
-		[
+		const badTokenErrors = [
 			SteamUser.EResult.AccessDenied,
 			SteamUser.EResult.Expired,
 			SteamUser.EResult.InvalidPassword,
@@ -126,7 +125,7 @@ class SteamCardFarmer {
 			SteamUser.EResult.Revoked,
 		];
 
-		if (badTokenErrors.includes(e.eresult) ) {
+		if (badTokenErrors.includes(e.eresult)) {
 			await unlinkFile(this.getRefreshTokenFilename());
 		}
 
@@ -549,6 +548,7 @@ class SteamCardFarmer {
 
 		if (fileExists(tokenFile)) {
 			const token = await readFile(tokenFile, "utf8");
+			this.log("Logging in using saved refresh token...");
 			this.logOn(null, token);
 			return;
 		}
