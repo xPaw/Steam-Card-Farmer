@@ -6,7 +6,7 @@ This script will idle all cards for all your games by playing up to 32 games at 
 
 - Install [Node.js](https://nodejs.org)
 - Run `git clone https://github.com/xPaw/Steam-Card-Farmer` (or [download code as zip](https://github.com/xPaw/Steam-Card-Farmer/archive/refs/heads/master.zip))
-- Run `npm install`
+- Run `npm install --omit=dev`
 - Run `npm start`
 
 ### Usage
