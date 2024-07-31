@@ -363,6 +363,7 @@ class SteamCardFarmer {
 			);
 		}
 
+		clearTimeout(this.checkTimer);
 		this.checkTimer = setTimeout(
 			async () => {
 				if (this.playStateBlocked) {
