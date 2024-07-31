@@ -238,7 +238,7 @@ class SteamCardFarmer {
 			}
 
 			const row = infoline.closest(".badge_row");
-			const href = row.querySelector(".badge_title_playgame a").getAttribute("href");
+			const href = row?.querySelector(".badge_title_playgame a")?.getAttribute("href");
 
 			if (!href) {
 				continue;
