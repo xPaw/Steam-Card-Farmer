@@ -5,12 +5,14 @@ import chalk from "ansi-colors";
 import enquirer from "enquirer";
 import { load as cheerio } from "cheerio";
 import { promisify } from "util";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync as fileExists } from "fs";
+import { writeFile, readFile } from "fs/promises";
 import { resolve as resolvePath } from "path";
 import ProtobufJS from "protobufjs";
 import arg from "arg";
 
 const setTimeoutAsync = promisify(setTimeout);
+const { dirname } = import.meta;
 
 // !!!
 //
@@ -59,22 +61,30 @@ class SteamCardFarmer {
 	/** @type {String[]} */
 	cookies = [];
 
+	accountName = "";
+
 	checkTimer = null;
 
 	playStateBlocked = false;
 
 	lastBadgesCheck = Date.now();
 
-	client = new SteamUser();
+	dataDirectory = resolvePath(dirname, "./data/");
+
+	client = new SteamUser({
+		dataDirectory: this.dataDirectory,
+	});
 
 	/**
-	 * @param {String} accountName
-	 * @param {String} password
+	 * @param {String|null} password
+	 * @param {String|null} refreshToken
 	 */
-	logOn(accountName, password) {
+	logOn(password = null, refreshToken = null) {
 		this.client.logOn({
-			accountName,
+			accountName: refreshToken ? null : this.accountName,
 			password,
+			refreshToken,
+			renewRefreshTokens: true,
 			machineName: "Steam-Card-Farmer",
 			logonID: 66666666,
 		});
@@ -82,6 +92,13 @@ class SteamCardFarmer {
 
 	onLoggedIn() {
 		this.log("Logged into Steam!");
+	}
+
+	/**
+	 * @param {String} token
+	 */
+	async onRefreshToken(token) {
+		await writeFile(this.getRefreshTokenFilename(), token, 'utf8');
 	}
 
 	/**
@@ -125,7 +142,6 @@ class SteamCardFarmer {
 
 		if (blocked) {
 			this.log(chalk.red("Play state is blocked by another client."));
-			clearTimeout(this.checkTimer);
 			return;
 		}
 
@@ -333,6 +349,11 @@ class SteamCardFarmer {
 
 		this.checkTimer = setTimeout(
 			async () => {
+				if (this.playStateBlocked) {
+					this.log(chalk.red("Play state is blocked, not cycling."));
+					return;
+				}
+
 				for (const app of appsToPlay) {
 					app.playtime += idleMinutes;
 				}
@@ -439,8 +460,9 @@ class SteamCardFarmer {
 			.catch(console.error); // eslint-disable-line no-console
 	}
 
-	init() {
-		this.client.on("loggedOn", () => this.onLoggedIn.bind(this));
+	async init() {
+		this.client.on("loggedOn", this.onLoggedIn.bind(this));
+		this.client.on("refreshToken", this.onRefreshToken.bind(this));
 		this.client.on("error", this.onError.bind(this));
 		this.client.on("disconnected", this.onDisconnected.bind(this));
 		this.client.on("playingState", this.onPlayingState.bind(this));
@@ -488,39 +510,48 @@ class SteamCardFarmer {
 			return;
 		}
 
-		if (args["--username"] && args["--password"]) {
-			this.logOn(args["--username"], args["--password"]);
+		if (typeof args["--username"] === "string") {
+			this.accountName = args["--username"].toLowerCase();
+		}
+
+		if (this.accountName && typeof args["--passwordd"] === "string") {
+			this.logOn(args["--password"]);
 			return;
 		}
 
 		const validate = (/** @type string */ input) => input.length > 0;
 
-		enquirer
-			.prompt([
-				{
-					type: "input",
-					name: "username",
-					message: "Steam username:",
-					initial: args["--username"] || "",
-					validate,
-				},
-				{
-					type: "password",
-					name: "password",
-					message: "Steam password:",
-					initial: args["--password"] || "",
-					validate,
-				},
-			])
-			.then((/** @type {{username: String, password: String}} */ result) =>
-				this.logOn(result.username, result.password),
-			)
-			.catch(console.error); // eslint-disable-line no-console
+		if (!this.accountName) {
+			/** @type {{username: String}} */
+			const result = await enquirer.prompt({
+				type: "input",
+				name: "username",
+				message: "Steam username:",
+				validate,
+			});
+			this.accountName = result.username.toLowerCase();
+		}
+
+		const tokenFile = this.getRefreshTokenFilename();
+
+		if (fileExists(tokenFile)) {
+			const token = await readFile(tokenFile, "utf8");
+			this.logOn(null, token);
+			return;
+		}
+
+		/** @type {{password: String}} */
+		const result = await enquirer.prompt({
+			type: "password",
+			name: "password",
+			message: "Steam password:",
+			initial: args["--password"] || "",
+			validate,
+		});
+		this.logOn(result.password);
 	}
 
 	handleNotifications() {
-		const { dirname } = import.meta;
-
 		const protobuf = ProtobufJS.Root.fromJSON(
 			JSON.parse(readFileSync(resolvePath(dirname, "./protobuf_steamnotifications.json"), "utf8")),
 		);
@@ -605,6 +636,10 @@ class SteamCardFarmer {
 		}, 500);
 	}
 
+	getRefreshTokenFilename() {
+		return resolvePath(this.dataDirectory, `./token.${this.accountName}.txt`);
+	}
+
 	/**
 	 * @param {String} message
 	 */
@@ -620,4 +655,4 @@ class SteamCardFarmer {
 }
 
 const farmer = new SteamCardFarmer();
-farmer.init();
+await farmer.init();
