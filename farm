@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+DIR="$(dirname "$(readlink -f "$0")")"
+node "$DIR/index.mjs" "$@"

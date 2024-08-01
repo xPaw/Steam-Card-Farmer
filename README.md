@@ -16,7 +16,8 @@ This script will idle all cards for all your games by playing up to 32 games at 
 > [!CAUTION]
 > If you have purchased a game in the past 14 days, **idling it will waive your right to a refund on Steam**.
 
-On the command line, just type `npm start` or `node index.mjs`.
+On the command line, just type `./farm`.
+On Windows, you can click `farm.bat`.
 
 If you want to play a game while idler is running, press **Continue Launch** in Steam, and idler will wait until you finish playing to resume idling. You do not need to shut down the idler.
 
@@ -27,7 +28,7 @@ Once logged in, it will store the refresh token in data folder, which will not a
 
 If the token was already stored, you can skip the interaction by passing username as an argument.
 
-For example: `node index.mjs -u hello --min-playtime 120`
+For example: `./farm -u hello --min-playtime 120`
 
 Name | Description
 ---- | -----------
