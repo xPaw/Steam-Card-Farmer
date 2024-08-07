@@ -156,7 +156,10 @@ class SteamCardFarmer {
 		}
 
 		this.log(chalk.green("Play state is no longer blocked."));
-		this.idle();
+
+		if (this.appsWithDrops.length > 0) {
+			this.idle();
+		}
 	}
 
 	/**
@@ -406,7 +409,7 @@ class SteamCardFarmer {
 		const appsUnderMinPlaytime = this.appsWithDrops.filter(({ playtime }) => playtime < MIN_PLAYTIME_TO_IDLE);
 
 		// if more than half of apps require idling, idle them
-		if (appsUnderMinPlaytime.length >= this.appsWithDrops.length / 2) {
+		if (appsUnderMinPlaytime.length > 0 && appsUnderMinPlaytime.length >= this.appsWithDrops.length / 2) {
 			this.log(
 				`${chalk.green(String(appsUnderMinPlaytime.length))} out of ${chalk.green(String(this.appsWithDrops.length))} apps require idling`,
 			);
