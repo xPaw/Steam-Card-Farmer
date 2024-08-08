@@ -71,6 +71,7 @@ class SteamCardFarmer {
 	dataDirectory = resolvePath(dirname, "./data/");
 
 	client = new SteamUser({
+		autoRelogin: false,
 		dataDirectory: this.dataDirectory,
 	});
 
@@ -110,8 +111,6 @@ class SteamCardFarmer {
 
 			this.log(chalk.red("Another client logged in elsewhere."));
 
-			setTimeout(() => this.client.logOn(true), 1000);
-
 			return;
 		}
 
@@ -127,7 +126,7 @@ class SteamCardFarmer {
 			await unlinkFile(this.getRefreshTokenFilename());
 		}
 
-		this.log(chalk.red(e.toString()));
+		this.log(chalk.red(`${e.toString()} (${e.eresult})`));
 	}
 
 	/**
@@ -137,7 +136,9 @@ class SteamCardFarmer {
 	onDisconnected(eResult, msg) {
 		clearTimeout(this.checkTimer);
 
-		this.log(chalk.red(`Disconnected: ${msg}`));
+		this.log(chalk.red(`Disconnected: ${msg} (${eResult})`));
+
+		setTimeout(() => this.client.logOn(true), 10000);
 	}
 
 	/**
@@ -323,6 +324,11 @@ class SteamCardFarmer {
 	idle() {
 		if (this.playStateBlocked) {
 			this.log(chalk.red("Play state is blocked, unable to idle."));
+			return;
+		}
+
+		if (!this.client.steamID) {
+			this.log(chalk.red("Not connected to Steam, unable to idle."));
 			return;
 		}
 
