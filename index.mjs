@@ -138,7 +138,7 @@ class SteamCardFarmer {
 
 		this.log(chalk.red(`Disconnected: ${msg} (${SteamUser.EResult[eResult] || eResult})`));
 
-		setTimeout(() => this.client.logOn(true), 10000);
+		this.checkTimer = setTimeout(() => this.client.logOn(true), 10000);
 	}
 
 	/**
