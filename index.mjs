@@ -126,7 +126,7 @@ class SteamCardFarmer {
 			await unlinkFile(this.getRefreshTokenFilename());
 		}
 
-		this.log(chalk.red(`${e.toString()} (${e.eresult})`));
+		this.log(chalk.red(`${e.toString()} (${SteamUser.EResult[e.eresult] || e.eresult})`));
 	}
 
 	/**
@@ -136,7 +136,7 @@ class SteamCardFarmer {
 	onDisconnected(eResult, msg) {
 		clearTimeout(this.checkTimer);
 
-		this.log(chalk.red(`Disconnected: ${msg} (${eResult})`));
+		this.log(chalk.red(`Disconnected: ${msg} (${SteamUser.EResult[eResult] || eResult})`));
 
 		setTimeout(() => this.client.logOn(true), 10000);
 	}
