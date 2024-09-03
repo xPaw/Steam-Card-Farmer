@@ -471,7 +471,7 @@ class SteamCardFarmer {
 	onNotificationsReceived(payload) {
 		const notificationIdsToRead = [];
 		const newItems = payload.notifications.filter(
-			(notification) => notification.notification_type === SteamUser.ESteamNotificationType.Item,
+			(notification) => notification.type === SteamUser.ESteamNotificationType.Item,
 		);
 
 		for (const notification of newItems) {
