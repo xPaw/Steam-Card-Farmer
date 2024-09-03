@@ -8,7 +8,6 @@ import chalk from "ansi-colors";
 import arg from "arg";
 import enquirer from "enquirer";
 import { JSDOM } from "jsdom";
-import ProtobufJS from "protobufjs";
 import SteamUser from "steam-user";
 
 const setTimeoutAsync = promisify(setTimeout);
@@ -469,6 +468,49 @@ class SteamCardFarmer {
 		} while (current <= appids.length);
 	}
 
+	onNotificationsReceived(payload) {
+		const notificationIdsToRead = [];
+		const newItems = payload.notifications.filter(
+			(notification) => notification.notification_type === SteamUser.ESteamNotificationType.Item,
+		);
+
+		for (const notification of newItems) {
+			if (notification.read || notification.viewed > 0) {
+				continue;
+			}
+
+			const item = notification.body;
+
+			if (!item || String(item.app_id) !== "753" || String(item.context_id) !== "6") {
+				continue;
+			}
+
+			const itemSourceAppId = item.source_appid;
+			const appIndex = this.appsWithDrops.findIndex(({ appid }) => appid === itemSourceAppId);
+
+			if (appIndex < 0) {
+				this.log(
+					`Got item drop for app ${itemSourceAppId}, but that is not an app we are idling - ${JSON.stringify(item)})`,
+				);
+				continue;
+			}
+
+			const app = this.appsWithDrops[appIndex];
+			app.drops -= 1;
+			this.log(`Got an item drop for app ${itemSourceAppId}, drops remaining: ${app.drops}`);
+
+			if (app.drops < 1) {
+				this.appsWithDrops.splice(appIndex, 1);
+			}
+
+			notificationIdsToRead.push(notification.id);
+		}
+
+		if (notificationIdsToRead.length > 0) {
+			this.client.markNotificationsRead(notificationIdsToRead);
+		}
+	}
+
 	/**
 	 * @param {String} domain
 	 * @param {Function} callback
@@ -495,7 +537,7 @@ class SteamCardFarmer {
 		this.client.on("playingState", this.onPlayingState.bind(this));
 		this.client.on("webSession", this.onWebSession.bind(this));
 		this.client.on("steamGuard", this.onSteamGuard.bind(this));
-		this.handleNotifications();
+		this.client.on("notificationsReceived", this.onNotificationsReceived.bind(this));
 
 		process.on("SIGINT", () => {
 			this.log("Logging off and shutting down...");
@@ -577,74 +619,6 @@ class SteamCardFarmer {
 			validate,
 		});
 		this.logOn(result.password);
-	}
-
-	handleNotifications() {
-		const protobuf = ProtobufJS.Root.fromJSON(
-			JSON.parse(readFileSync(resolvePath(dirname, "./protobuf_steamnotifications.json"), "utf8")),
-		);
-		const protobufRead = ProtobufJS.Root.fromJSON(
-			JSON.parse(readFileSync(resolvePath(dirname, "./protobuf_steamnotification_read.json"), "utf8")),
-		);
-
-		this.client._handlerManager.add("SteamNotificationClient.NotificationsReceived#1", (body) => {
-			const notifications = SteamUser._decodeProto(
-				protobuf.CSteamNotification_NotificationsReceived_Notification,
-				body,
-			);
-
-			const notificationIdsToRead = [];
-			const newItems = notifications.notifications.filter(
-				(notification) =>
-					notification.notification_type === protobuf.ESteamNotificationType.k_ESteamNotificationType_Item,
-			);
-
-			for (const notification of newItems) {
-				if (notification.read || notification.viewed > 0) {
-					continue;
-				}
-
-				const item = JSON.parse(notification.body_data);
-
-				if (!item || String(item.app_id) !== "753" || String(item.context_id) !== "6") {
-					continue;
-				}
-
-				const itemSourceAppId = item.source_appid;
-				const appIndex = this.appsWithDrops.findIndex(({ appid }) => appid === itemSourceAppId);
-
-				if (appIndex < 0) {
-					this.log(
-						`Got item drop for app ${itemSourceAppId}, but that is not an app we are idling - ${notification.body_data})`,
-					);
-					continue;
-				}
-
-				const app = this.appsWithDrops[appIndex];
-				app.drops -= 1;
-				this.log(`Got an item drop for app ${itemSourceAppId}, drops remaining: ${app.drops}`);
-
-				if (app.drops < 1) {
-					this.appsWithDrops.splice(appIndex, 1);
-				}
-
-				notificationIdsToRead.push(notification.notification_id);
-			}
-
-			if (notificationIdsToRead.length > 0) {
-				this.client._send(
-					{
-						msg: 151, // EMsg.ServiceMethodCallFromClient
-						proto: {
-							target_job_name: "SteamNotification.MarkNotificationsRead#1",
-						},
-					},
-					protobufRead.CSteamNotification_MarkNotificationsRead_Notification.encode({
-						notification_ids: notificationIdsToRead,
-					}).finish(),
-				);
-			}
-		});
 	}
 
 	/**
