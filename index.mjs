@@ -583,7 +583,7 @@ class SteamCardFarmer {
 			this.accountName = args["--username"].toLowerCase();
 		}
 
-		if (this.accountName && typeof args["--passwordd"] === "string") {
+		if (this.accountName && typeof args["--password"] === "string") {
 			this.logOn(args["--password"]);
 			return;
 		}
