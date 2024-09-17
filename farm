@@ -1,4 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
 DIR="$(dirname "$(readlink -f "$0")")"
+
+if ! command -v node &> /dev/null; then
+	echo "Node.js is not installed or not in the system PATH."
+	echo "Please install Node.js from https://nodejs.org/"
+	exit 1
+fi
+
+if [ ! -d "$DIR/node_modules" ]; then
+	echo "node_modules folder not found, please run \"npm install --omit=dev\""
+	exit 1
+fi
+
 node "$DIR/index.mjs" "$@"
