@@ -485,19 +485,22 @@ class SteamCardFarmer {
 				continue;
 			}
 
-			const itemSourceAppId = item.source_appid;
+			const itemSourceAppId = Number(item.source_appid);
 			const appIndex = this.appsWithDrops.findIndex(({ appid }) => appid === itemSourceAppId);
 
 			if (appIndex < 0) {
 				this.log(
-					`Got item drop for app ${itemSourceAppId}, but that is not an app we are idling - ${JSON.stringify(item)})`,
+					`Got a drop for app ${chalk.green(itemSourceAppId.toString())}, but that is not an app we are idling - ${JSON.stringify(item)})`,
 				);
 				continue;
 			}
 
 			const app = this.appsWithDrops[appIndex];
 			app.drops -= 1;
-			this.log(`Got an item drop for app ${itemSourceAppId}, drops remaining: ${app.drops}`);
+
+			this.log(
+				`Got a drop for app ${chalk.green(itemSourceAppId.toString())}, drops remaining: ${chalk.green(app.drops.toString())}`,
+			);
 
 			if (app.drops < 1) {
 				this.appsWithDrops.splice(appIndex, 1);
