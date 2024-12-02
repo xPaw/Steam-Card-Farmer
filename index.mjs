@@ -8,6 +8,7 @@ import chalk from "ansi-colors";
 import arg from "arg";
 import enquirer from "enquirer";
 import { JSDOM } from "jsdom";
+import ProtobufJS from "protobufjs";
 import SteamUser from "steam-user";
 
 const setTimeoutAsync = promisify(setTimeout);
@@ -67,6 +68,9 @@ class SteamCardFarmer {
 
 	lastBadgesCheck = Date.now();
 
+	/** @type Set<Number> */
+	privateApps = new Set();
+
 	dataDirectory = resolvePath(dirname, "./data/");
 
 	client = new SteamUser({
@@ -90,6 +94,7 @@ class SteamCardFarmer {
 
 	onLoggedIn() {
 		this.log("Logged into Steam!");
+		this.getPrivateApps();
 	}
 
 	/**
@@ -266,6 +271,11 @@ class SteamCardFarmer {
 			if (playTimeMatch) {
 				playtime = Number.parseFloat(playTimeMatch.groups.playtime) || 0.0;
 				playtime = Math.round(playtime * 60);
+			}
+
+			if (this.privateApps.has(appid)) {
+				this.log(chalk.red(`App ${appid} has ${drops} drops, but it cannot be idled because it is private.`));
+				continue;
 			}
 
 			const app = {
@@ -512,6 +522,30 @@ class SteamCardFarmer {
 		if (notificationIdsToRead.length > 0) {
 			this.client.markNotificationsRead(notificationIdsToRead);
 		}
+	}
+
+	getPrivateApps() {
+		const protobuf = ProtobufJS.Root.fromJSON(
+			JSON.parse(readFileSync(resolvePath(dirname, "./protobuf_service_accountprivateapps.json"), "utf8")),
+		);
+
+		this.client._send(
+			{
+				msg: 151, // EMsg.ServiceMethodCallFromClient
+				proto: {
+					target_job_name: "AccountPrivateApps.GetPrivateAppList#1",
+				},
+			},
+			protobuf.CAccountPrivateApps_GetPrivateAppList_Request.encode({}).finish(),
+			(body) => {
+				const response = SteamUser._decodeProto(protobuf.CAccountPrivateApps_GetPrivateAppList_Response, body);
+				this.privateApps = new Set(response.private_apps.appids);
+
+				if (this.privateApps.size > 0) {
+					this.log(`You have ${this.privateApps.size} private apps`);
+				}
+			},
+		);
 	}
 
 	/**
