@@ -40,6 +40,29 @@ Name | Description
 
 Use `--min-playtime 0` if your account is not limited due to refunds and you get card drops from zero minutes of playtime.
 
+### How it works
+
+1. It checks your badges page to find which apps have drops available. Apps that are marked as private will be ignored.
+
+2. It identifies all apps that need playtime
+
+3. If more than half of all apps need playtime, it enters "playtime idling mode" where:
+   - It prioritizes idling those under-playtime apps
+   - If there aren't enough under-playtime apps to hit the concurrent limit, it fills the remaining slots with other apps that have the lowest playtime
+
+4. If not in playtime mode (meaning most apps have sufficient playtime), it simply takes all apps that still have card drops remaining
+
+5. For the final selection in both modes:
+   - Apps are sorted by highest playtime first
+   - It takes up to the maximum number of concurrent apps allowed
+   - The final selection is randomly shuffled before idling begins
+
+6. Later, this process is performed again to check whether apps can be cycled now. After idling a batch of games for 5 minutes, cycling begins. The cycling process happens gradually:
+   - Starts with all apps running
+   - Quits one app at a time
+   - Waits 10 seconds (configurable) between each app removal
+   - Continues until no apps are running
+
 ### License
 
 Released under [the MIT license](https://opensource.org/license/mit/).
