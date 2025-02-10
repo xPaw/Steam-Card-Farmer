@@ -23,6 +23,7 @@ const { dirname } = import.meta;
 
 let MAX_APPS_AT_ONCE = 32; // how many apps to idle at once
 let MIN_PLAYTIME_TO_IDLE = 180; // minimum playtime in minutes without cycling
+let CYCLE_MINUTES_BETWEEN = 5;
 let CYCLE_DELAY = 10000; // how many milliseconds to wait between cycling apps
 
 /**
@@ -350,16 +351,16 @@ class SteamCardFarmer {
 
 		this.client.gamesPlayed(appids);
 
-		let idleMinutes = 5;
+		let idleMinutes = CYCLE_MINUTES_BETWEEN;
 
 		if (requiresIdling) {
 			// take the median time until minimum playtime is reached and then check again
 			const medianPlaytime = appsToPlay[Math.floor(appsToPlay.length / 2)];
 			idleMinutes = MIN_PLAYTIME_TO_IDLE - medianPlaytime.playtime;
 
-			if (idleMinutes < 5) {
+			if (idleMinutes < CYCLE_MINUTES_BETWEEN) {
 				requiresIdling = false;
-				idleMinutes = 5;
+				idleMinutes = CYCLE_MINUTES_BETWEEN;
 			}
 		}
 
@@ -589,6 +590,7 @@ class SteamCardFarmer {
 				"--password": String,
 				"--concurrent-apps": Number,
 				"--min-playtime": Number,
+				"--cycle-minutes": Number,
 				"--cycle-delay": Number,
 
 				"-u": "--username",
@@ -605,6 +607,10 @@ class SteamCardFarmer {
 
 			if (typeof args["--min-playtime"] !== "undefined") {
 				MIN_PLAYTIME_TO_IDLE = args["--min-playtime"];
+			}
+
+			if (typeof args["--cycle-minutes"] !== "undefined") {
+				CYCLE_MINUTES_BETWEEN = args["--cycle-minutes"];
 			}
 
 			if (typeof args["--cycle-delay"] !== "undefined") {
