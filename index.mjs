@@ -27,8 +27,17 @@ let CYCLE_MINUTES_BETWEEN = 5;
 let CYCLE_DELAY = 10000; // how many milliseconds to wait between cycling apps
 
 /**
- * @param {Array} arr
+ * @typedef {Object} AppWithDrops
+ * @property {number} appid - The Steam app ID
+ * @property {number} playtime - Playtime in minutes
+ * @property {number} drops - Remaining card drops
+ */
+
+/**
+ * @template T
+ * @param {T[]} arr
  * @param {Number} end
+ * @returns {T[]}
  */
 function arrayTakeFirst(arr, end) {
 	const result = [];
@@ -55,7 +64,7 @@ function arrayShuffle(array) {
 }
 
 class SteamCardFarmer {
-	/** @type {{appid: number, playtime: number, drops: number}[]} */
+	/** @type {AppWithDrops[]} */
 	appsWithDrops = [];
 
 	/** @type {String[]} */
@@ -63,6 +72,7 @@ class SteamCardFarmer {
 
 	accountName = "";
 
+	/** @type {NodeJS.Timeout?} */
 	checkTimer = null;
 
 	playStateBlocked = false;
@@ -280,6 +290,7 @@ class SteamCardFarmer {
 				continue;
 			}
 
+			/** @type {AppWithDrops} */
 			const app = {
 				appid,
 				playtime,
@@ -420,9 +431,13 @@ class SteamCardFarmer {
 		);
 	}
 
+	/**
+	 * @returns {{requiresIdling: boolean, appsToPlay: AppWithDrops[]}}
+	 */
 	getAppsToPlay() {
-		let requiresIdling = false;
+		/** @type {AppWithDrops[]} */
 		let appsToPlay = [];
+		let requiresIdling = false;
 		const appsUnderMinPlaytime = this.appsWithDrops.filter(({ playtime }) => playtime < MIN_PLAYTIME_TO_IDLE);
 
 		// if more than half of apps require idling, idle them
