@@ -69,7 +69,7 @@ class SteamCardFarmer {
 
 	lastBadgesCheck = Date.now();
 
-	/** @type Set<Number> */
+	/** @type {Set<Number>} */
 	privateApps = new Set();
 
 	dataDirectory = resolvePath(dirname, "./data/");
@@ -233,6 +233,7 @@ class SteamCardFarmer {
 
 		let pageDrops = 0;
 		let pageApps = 0;
+		/** @type {Map<number, number>} */
 		const appIdToApp = new Map();
 
 		for (let i = 0; i < this.appsWithDrops.length; i += 1) {
@@ -294,8 +295,8 @@ class SteamCardFarmer {
 				continue;
 			}
 
+			appIdToApp.set(appid, this.appsWithDrops.length);
 			this.appsWithDrops.push(app);
-			appIdToApp.set(appid, app);
 		}
 
 		if (pageDrops > 0) {
