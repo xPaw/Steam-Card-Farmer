@@ -600,8 +600,8 @@ class SteamCardFarmer {
 			if (typeof args["--concurrent-apps"] !== "undefined") {
 				MAX_APPS_AT_ONCE = args["--concurrent-apps"];
 
-				if (MAX_APPS_AT_ONCE < 1 || MAX_APPS_AT_ONCE) {
-					throw new Error("--concurrent-apps out of range");
+				if (MAX_APPS_AT_ONCE < 1 || MAX_APPS_AT_ONCE > 32) {
+					throw new Error("--concurrent-apps out of range: must be between 1 and 32.");
 				}
 			}
 
