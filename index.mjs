@@ -623,14 +623,26 @@ class SteamCardFarmer {
 
 			if (typeof args["--min-playtime"] !== "undefined") {
 				MIN_PLAYTIME_TO_IDLE = args["--min-playtime"];
+
+				if (MIN_PLAYTIME_TO_IDLE < 0) {
+					throw new Error("--min-playtime must be positive.");
+				}
 			}
 
 			if (typeof args["--cycle-minutes"] !== "undefined") {
 				CYCLE_MINUTES_BETWEEN = args["--cycle-minutes"];
+
+				if (CYCLE_MINUTES_BETWEEN < 0) {
+					throw new Error("--cycle-minutes must be positive.");
+				}
 			}
 
 			if (typeof args["--cycle-delay"] !== "undefined") {
 				CYCLE_DELAY = args["--cycle-delay"];
+
+				if (CYCLE_DELAY < 0) {
+					throw new Error("--cycle-delay must be positive.");
+				}
 			}
 		} catch (e) {
 			console.error(e.message);
