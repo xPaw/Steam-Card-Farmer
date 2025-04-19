@@ -157,11 +157,11 @@ class SteamCardFarmer {
 		this.playStateBlocked = blocked;
 
 		if (blocked) {
-			this.log(chalk.red("Play state is blocked by another client."));
+			this.log(chalk.red("You started playing a game elsewhere, idling will resume when you quit."));
 			return;
 		}
 
-		this.log(chalk.green("Play state is no longer blocked."));
+		this.log(chalk.green("You are no longer playing a game elsewhere, resuming."));
 
 		if (this.appsWithDrops.length > 0) {
 			this.idle();
@@ -333,12 +333,12 @@ class SteamCardFarmer {
 
 	idle() {
 		if (this.playStateBlocked) {
-			this.log(chalk.red("Play state is blocked, unable to idle."));
+			this.log(chalk.red("Unable to idle cards while you are playing a game elsewhere."));
 			return;
 		}
 
 		if (!this.client.steamID) {
-			this.log(chalk.red("Not connected to Steam, unable to idle."));
+			this.log(chalk.red("Unable to idle because disconnected from Steam."));
 			return;
 		}
 
@@ -386,7 +386,7 @@ class SteamCardFarmer {
 		this.checkTimer = setTimeout(
 			async () => {
 				if (this.playStateBlocked) {
-					this.log(chalk.red("Play state is blocked, not cycling."));
+					this.log(chalk.red("Not cycling apps because you are playing a game elsewhere."));
 					return;
 				}
 
@@ -468,7 +468,7 @@ class SteamCardFarmer {
 			await setTimeoutAsync(CYCLE_DELAY);
 
 			if (this.playStateBlocked) {
-				this.log(chalk.red("Play state got blocked while cycling."));
+				this.log(chalk.red("Not cycling apps because you are playing a game elsewhere."));
 				return;
 			}
 
