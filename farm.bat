@@ -15,5 +15,5 @@ if not exist "%~dp0node_modules" (
 	exit /b 1
 )
 
-node %~dp0index.mjs %*
+node %~dp0index.ts %*
 pause

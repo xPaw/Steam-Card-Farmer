@@ -26,21 +26,37 @@ let MIN_PLAYTIME_TO_IDLE = 180; // minimum playtime in minutes without cycling
 let CYCLE_MINUTES_BETWEEN = 5;
 let CYCLE_DELAY = 10000; // how many milliseconds to wait between cycling apps
 
-/**
- * @typedef {Object} AppWithDrops
- * @property {number} appid - The Steam app ID
- * @property {number} playtime - Playtime in minutes
- * @property {number} drops - Remaining card drops
- */
+interface AppWithDrops {
+	appid: number;
+	playtime: number;
+	drops: number;
+}
 
-/**
- * @template T
- * @param {T[]} arr
- * @param {Number} end
- * @returns {T[]}
- */
-function arrayTakeFirst(arr, end) {
-	const result = [];
+interface NotificationBody {
+	app_id: string;
+	context_id: string;
+	source_appid: string;
+}
+
+interface SteamNotification {
+	id: string;
+	type: number;
+	read: boolean;
+	viewed: number;
+	body: NotificationBody;
+}
+
+interface NotificationsPayload {
+	notifications: SteamNotification[];
+}
+
+interface GetAppsToPlayResult {
+	requiresIdling: boolean;
+	appsToPlay: AppWithDrops[];
+}
+
+function arrayTakeFirst<T>(arr: T[], end: number): T[] {
+	const result: T[] = [];
 
 	for (let i = 0; i < end && i < arr.length; i += 1) {
 		result.push(arr[i]);
@@ -49,10 +65,7 @@ function arrayTakeFirst(arr, end) {
 	return result;
 }
 
-/**
- * @param {Array} array
- */
-function arrayShuffle(array) {
+function arrayShuffle<T>(array: T[]): void {
 	let currentIndex = array.length;
 
 	while (currentIndex !== 0) {
@@ -64,24 +77,13 @@ function arrayShuffle(array) {
 }
 
 class SteamCardFarmer {
-	/** @type {AppWithDrops[]} */
-	appsWithDrops = [];
-
-	/** @type {String[]} */
-	cookies = [];
-
+	appsWithDrops: AppWithDrops[] = [];
+	cookies: string[] = [];
 	accountName = "";
-
-	/** @type {NodeJS.Timeout?} */
-	checkTimer = null;
-
+	checkTimer = setTimeout(() => {}, 0);
 	playStateBlocked = false;
-
 	lastBadgesCheck = Date.now();
-
-	/** @type {Set<Number>} */
-	privateApps = new Set();
-
+	privateApps = new Set<number>();
 	dataDirectory = resolvePath(dirname, "./data/");
 
 	client = new SteamUser({
@@ -89,36 +91,35 @@ class SteamCardFarmer {
 		dataDirectory: this.dataDirectory,
 	});
 
-	/**
-	 * @param {String|null} password
-	 * @param {String|null} refreshToken
-	 */
-	logOn(password = null, refreshToken = null) {
-		this.client.logOn({
-			accountName: refreshToken ? null : this.accountName,
-			password,
-			refreshToken,
-			machineName: "Steam-Card-Farmer",
-			logonID: 66666666,
-		});
+	logOn(password: string | null = null, refreshToken: string | null = null): void {
+		if (refreshToken) {
+			this.client.logOn({
+				refreshToken,
+				machineName: "Steam-Card-Farmer",
+				logonID: 66666666,
+			});
+		} else if (password) {
+			this.client.logOn({
+				accountName: this.accountName,
+				password,
+				machineName: "Steam-Card-Farmer",
+				logonID: 66666666,
+			});
+		} else {
+			throw new Error("No logon method specified");
+		}
 	}
 
-	onLoggedIn() {
+	onLoggedIn(): void {
 		this.log("Logged into Steam!");
 		this.getPrivateApps();
 	}
 
-	/**
-	 * @param {String} token
-	 */
-	async onRefreshToken(token) {
+	async onRefreshToken(token: string): Promise<void> {
 		await writeFile(this.getRefreshTokenFilename(), token, "utf8");
 	}
 
-	/**
-	 * @param {Error & ({eresult: SteamUser.EResult})} e
-	 */
-	async onError(e) {
+	async onError(e: Error & { eresult: SteamUser.EResult }): Promise<void> {
 		clearTimeout(this.checkTimer);
 
 		if (e.eresult === SteamUser.EResult.LoggedInElsewhere) {
@@ -144,11 +145,7 @@ class SteamCardFarmer {
 		this.log(chalk.red(`${e.toString()} (${SteamUser.EResult[e.eresult] || e.eresult})`));
 	}
 
-	/**
-	 * @param {SteamUser.EResult} eResult
-	 * @param {String} msg
-	 */
-	onDisconnected(eResult, msg) {
+	onDisconnected(eResult: SteamUser.EResult, msg?: string): void {
 		clearTimeout(this.checkTimer);
 
 		this.log(chalk.red(`Disconnected: ${msg} (${SteamUser.EResult[eResult] || eResult})`));
@@ -156,10 +153,7 @@ class SteamCardFarmer {
 		this.checkTimer = setTimeout(() => this.client.logOn(true), 10000);
 	}
 
-	/**
-	 * @param {Boolean} blocked
-	 */
-	onPlayingState(blocked) {
+	onPlayingState(blocked: boolean): void {
 		if (this.playStateBlocked === blocked) {
 			return;
 		}
@@ -178,11 +172,7 @@ class SteamCardFarmer {
 		}
 	}
 
-	/**
-	 * @param {String} sessionID
-	 * @param {String[]} cookies
-	 */
-	onWebSession(sessionID, cookies) {
+	onWebSession(_sessionID: string, cookies: string[]): void {
 		this.cookies = cookies;
 		this.cookies.push("Steam_Language=english");
 
@@ -194,22 +184,20 @@ class SteamCardFarmer {
 		}, 1000 * 2);
 	}
 
-	/**
-	 * @param {Number} page
-	 * @param {Boolean} syncOnly
-	 */
-	async requestBadgesPage(page, syncOnly = false) {
-		let url = "";
-
-		if (this.client.vanityURL) {
-			url = `id/${this.client.vanityURL}`;
-		} else {
-			url = `profiles/${this.client.steamID.getSteamID64()}`;
-		}
-
-		let document;
+	async requestBadgesPage(page: number, syncOnly = false): Promise<void> {
+		let document: Document;
 
 		try {
+			let url = "";
+
+			if (this.client.vanityURL) {
+				url = `id/${this.client.vanityURL}`;
+			} else if (this.client.steamID) {
+				url = `profiles/${this.client.steamID.getSteamID64()}`;
+			} else {
+				throw new Error("No SteamID or vanity URL.");
+			}
+
 			const headers = new Headers();
 			headers.append("User-Agent", "Steam-Card-Farmer (+https://github.com/xPaw/Steam-Card-Farmer)");
 			headers.append("Cookie", this.cookies.join("; "));
@@ -243,15 +231,14 @@ class SteamCardFarmer {
 
 		let pageDrops = 0;
 		let pageApps = 0;
-		/** @type {Map<number, number>} */
-		const appIdToApp = new Map();
+		const appIdToApp = new Map<number, number>();
 
 		for (let i = 0; i < this.appsWithDrops.length; i += 1) {
 			appIdToApp.set(this.appsWithDrops[i].appid, i);
 		}
 
 		for (const infoline of document.querySelectorAll(".progress_info_bold")) {
-			const match = infoline.textContent.match(/(\d+)/);
+			const match = infoline.textContent?.match(/(\d+)/);
 
 			if (!match) {
 				continue;
@@ -260,7 +247,7 @@ class SteamCardFarmer {
 			const row = infoline.closest(".badge_row");
 			const href = row?.querySelector(".badge_title_playgame a")?.getAttribute("href");
 
-			if (!href) {
+			if (!row || !href) {
 				continue;
 			}
 
@@ -278,9 +265,9 @@ class SteamCardFarmer {
 			let playtime = 0.0;
 			const playTimeMatch = row
 				.querySelector(".badge_title_stats_playtime")
-				.textContent.match(/(?<playtime>\d+\.\d+)/);
+				?.textContent?.match(/(?<playtime>\d+\.\d+)/);
 
-			if (playTimeMatch) {
+			if (playTimeMatch?.groups?.playtime) {
 				playtime = Number.parseFloat(playTimeMatch.groups.playtime) || 0.0;
 				playtime = Math.round(playtime * 60);
 			}
@@ -290,8 +277,7 @@ class SteamCardFarmer {
 				continue;
 			}
 
-			/** @type {AppWithDrops} */
-			const app = {
+			const app: AppWithDrops = {
 				appid,
 				playtime,
 				drops,
@@ -326,7 +312,7 @@ class SteamCardFarmer {
 		const pageLinks = document.querySelectorAll(".pagelink");
 
 		if (pageLinks.length > 0) {
-			lastPage = Number.parseInt(pageLinks[pageLinks.length - 1].textContent, 10) || 1;
+			lastPage = Number.parseInt(pageLinks[pageLinks.length - 1].textContent || "1", 10) || 1;
 		}
 
 		if (page <= lastPage) {
@@ -343,7 +329,7 @@ class SteamCardFarmer {
 		this.lastBadgesCheck = Date.now();
 	}
 
-	idle() {
+	idle(): void {
 		if (this.playStateBlocked) {
 			this.log(chalk.red("Unable to idle cards while you are playing a game elsewhere."));
 			return;
@@ -431,12 +417,8 @@ class SteamCardFarmer {
 		);
 	}
 
-	/**
-	 * @returns {{requiresIdling: boolean, appsToPlay: AppWithDrops[]}}
-	 */
-	getAppsToPlay() {
-		/** @type {AppWithDrops[]} */
-		let appsToPlay = [];
+	getAppsToPlay(): GetAppsToPlayResult {
+		let appsToPlay: AppWithDrops[] = [];
 		let requiresIdling = false;
 		const appsUnderMinPlaytime = this.appsWithDrops.filter(({ playtime }) => playtime < MIN_PLAYTIME_TO_IDLE);
 
@@ -472,10 +454,7 @@ class SteamCardFarmer {
 		return { requiresIdling, appsToPlay };
 	}
 
-	/**
-	 * @param {Number[]} appids
-	 */
-	async cycleApps(appids) {
+	async cycleApps(appids: number[]): Promise<void> {
 		this.log("Cycling apps...");
 
 		let current = 1;
@@ -495,9 +474,10 @@ class SteamCardFarmer {
 		} while (current <= appids.length);
 	}
 
-	onNotificationsReceived(payload) {
-		const notificationIdsToRead = [];
+	onNotificationsReceived(payload: NotificationsPayload): void {
+		const notificationIdsToRead: string[] = [];
 		const newItems = payload.notifications.filter(
+			// @ts-expect-error TS2339
 			(notification) => notification.type === SteamUser.ESteamNotificationType.Item,
 		);
 
@@ -537,15 +517,17 @@ class SteamCardFarmer {
 		}
 
 		if (notificationIdsToRead.length > 0) {
+			// @ts-expect-error TS2339
 			this.client.markNotificationsRead(notificationIdsToRead);
 		}
 	}
 
-	getPrivateApps() {
+	getPrivateApps(): void {
 		const protobuf = ProtobufJS.Root.fromJSON(
 			JSON.parse(readFileSync(resolvePath(dirname, "./protobuf_service_accountprivateapps.json"), "utf8")),
 		);
 
+		// @ts-expect-error TS2339
 		this.client._send(
 			{
 				msg: 151, // EMsg.ServiceMethodCallFromClient
@@ -553,8 +535,11 @@ class SteamCardFarmer {
 					target_job_name: "AccountPrivateApps.GetPrivateAppList#1",
 				},
 			},
+			// @ts-expect-error TS2339
 			protobuf.CAccountPrivateApps_GetPrivateAppList_Request.encode({}).finish(),
-			(body) => {
+			// biome-ignore lint/suspicious/noExplicitAny: protobuf
+			(body: any) => {
+				// @ts-expect-error TS2339
 				const response = SteamUser._decodeProto(protobuf.CAccountPrivateApps_GetPrivateAppList_Response, body);
 				this.privateApps = new Set(response.private_apps.appids);
 
@@ -565,25 +550,21 @@ class SteamCardFarmer {
 		);
 	}
 
-	/**
-	 * @param {String} domain
-	 * @param {Function} callback
-	 */
-	onSteamGuard(domain, callback) {
+	onSteamGuard(domain: string | null, callback: (code: string) => void): void {
 		enquirer
-			.prompt([
+			.prompt<{ code: string }>([
 				{
 					type: "input",
 					name: "code",
 					message: domain ? `Steam guard code sent to ${domain}:` : "Steam app code:",
-					validate: (input) => input.length === 5,
+					validate: (input: string) => input.length === 5,
 				},
 			])
-			.then((/** @type {{code: String}} */ result) => callback(result.code))
+			.then((result) => callback(result.code))
 			.catch(console.error);
 	}
 
-	async init() {
+	async init(): Promise<void> {
 		this.client.on("loggedOn", this.onLoggedIn.bind(this));
 		this.client.on("refreshToken", this.onRefreshToken.bind(this));
 		this.client.on("error", this.onError.bind(this));
@@ -591,6 +572,7 @@ class SteamCardFarmer {
 		this.client.on("playingState", this.onPlayingState.bind(this));
 		this.client.on("webSession", this.onWebSession.bind(this));
 		this.client.on("steamGuard", this.onSteamGuard.bind(this));
+		// @ts-expect-error TS2339
 		this.client.on("notificationsReceived", this.onNotificationsReceived.bind(this));
 
 		process.on("SIGINT", () => {
@@ -598,10 +580,10 @@ class SteamCardFarmer {
 			this.shutdown(0);
 		});
 
-		let args;
+		let password = "";
 
 		try {
-			args = arg({
+			const args = arg({
 				"--username": String,
 				"--password": String,
 				"--concurrent-apps": Number,
@@ -644,26 +626,29 @@ class SteamCardFarmer {
 					throw new Error("--cycle-delay must be positive.");
 				}
 			}
+
+			if (typeof args["--username"] === "string") {
+				this.accountName = args["--username"].toLowerCase();
+			}
+
+			if (this.accountName && typeof args["--password"] === "string") {
+				this.logOn(args["--password"]);
+				return;
+			}
+
+			if (typeof args["--password"] === "string") {
+				password = args["--password"];
+			}
 		} catch (e) {
-			console.error(e.message);
+			console.error((e as Error).message);
 			process.exit(1);
 			return;
 		}
 
-		if (typeof args["--username"] === "string") {
-			this.accountName = args["--username"].toLowerCase();
-		}
-
-		if (this.accountName && typeof args["--password"] === "string") {
-			this.logOn(args["--password"]);
-			return;
-		}
-
-		const validate = (/** @type string */ input) => input.length > 0;
+		const validate = (input: string): boolean => input.length > 0;
 
 		if (!this.accountName) {
-			/** @type {{username: String}} */
-			const result = await enquirer.prompt({
+			const result = await enquirer.prompt<{ username: string }>({
 				type: "input",
 				name: "username",
 				message: "Steam username:",
@@ -681,21 +666,17 @@ class SteamCardFarmer {
 			return;
 		}
 
-		/** @type {{password: String}} */
-		const result = await enquirer.prompt({
+		const result = await enquirer.prompt<{ password: string }>({
 			type: "password",
 			name: "password",
 			message: "Steam password:",
-			initial: args["--password"] || "",
+			initial: password,
 			validate,
 		});
 		this.logOn(result.password);
 	}
 
-	/**
-	 * @param {Number} code
-	 */
-	shutdown(code) {
+	shutdown(code: number): void {
 		this.client.gamesPlayed([]);
 		this.client.logOff();
 		this.client.once("disconnected", () => {
@@ -707,14 +688,11 @@ class SteamCardFarmer {
 		}, 500);
 	}
 
-	getRefreshTokenFilename() {
+	getRefreshTokenFilename(): string {
 		return resolvePath(this.dataDirectory, `./token.${this.accountName}.txt`);
 	}
 
-	/**
-	 * @param {String} message
-	 */
-	log(message) {
+	log(message: string): void {
 		const date = new Date();
 		const isoDateTime = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
 		const formatted = `[${isoDateTime.toISOString().split(".")[0].replace("T", " ")}]`;

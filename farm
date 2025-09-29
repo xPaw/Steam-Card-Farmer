@@ -14,4 +14,4 @@ if [ ! -d "$DIR/node_modules" ]; then
 	exit 1
 fi
 
-node "$DIR/index.mjs" "$@"
+node "$DIR/index.ts" "$@"
