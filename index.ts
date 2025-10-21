@@ -590,10 +590,17 @@ class SteamCardFarmer {
 				"--min-playtime": Number,
 				"--cycle-minutes": Number,
 				"--cycle-delay": Number,
+				"--debug": Boolean,
 
 				"-u": "--username",
 				"-p": "--password",
 			});
+
+			if (args["--debug"]) {
+				this.client.on("debug", (message: string) => {
+					this.log(chalk.gray(`[DEBUG] ${message}`));
+				});
+			}
 
 			if (typeof args["--concurrent-apps"] !== "undefined") {
 				MAX_APPS_AT_ONCE = args["--concurrent-apps"];
