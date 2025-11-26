@@ -38,6 +38,7 @@ Name | Description
 `--min-playtime` | minimum playtime in minutes without cycling (180 minutes by default)
 `--cycle-minutes` | how many minutes to wait between cycles (5 minutes by default)
 `--cycle-delay` | how many milliseconds to wait between cycling apps (10 seconds by default)
+`--cycle-apps` | how many apps to cycle (quit) at once (1 by default)
 
 Use `--min-playtime 0` if your account is not limited due to refunds and you get card drops from zero minutes of playtime.
 
@@ -60,8 +61,8 @@ Use `--min-playtime 0` if your account is not limited due to refunds and you get
 
 6. Later, this process is performed again to check whether apps can be cycled now. After idling a batch of games for 5 minutes, cycling begins. The cycling process happens gradually:
    - Starts with all apps running
-   - Quits one app at a time
-   - Waits 10 seconds (configurable) between each app removal
+   - Quits apps in batches (configurable)
+   - Waits configurable amount of time between each cycle
    - Continues until no apps are running
 
 ### License

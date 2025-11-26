@@ -25,6 +25,7 @@ let MAX_APPS_AT_ONCE = 32; // how many apps to idle at once
 let MIN_PLAYTIME_TO_IDLE = 180; // minimum playtime in minutes without cycling
 let CYCLE_MINUTES_BETWEEN = 5;
 let CYCLE_DELAY = 10000; // how many milliseconds to wait between cycling apps
+let CYCLE_APPS_AT_ONCE = 4; // how many apps to cycle (quit) at once
 
 interface AppWithDrops {
 	appid: number;
@@ -457,7 +458,7 @@ class SteamCardFarmer {
 	async cycleApps(appids: number[]): Promise<void> {
 		this.log("Cycling apps...");
 
-		let current = 1;
+		let current = CYCLE_APPS_AT_ONCE;
 
 		do {
 			await setTimeoutAsync(CYCLE_DELAY);
@@ -467,10 +468,10 @@ class SteamCardFarmer {
 				return;
 			}
 
-			// quit apps one by one until the list is empty
+			// quit apps until the list is empty
 			this.client.gamesPlayed(appids.slice(current));
 
-			current += 1;
+			current += CYCLE_APPS_AT_ONCE;
 		} while (current <= appids.length);
 	}
 
@@ -590,6 +591,7 @@ class SteamCardFarmer {
 				"--min-playtime": Number,
 				"--cycle-minutes": Number,
 				"--cycle-delay": Number,
+				"--cycle-apps": Number,
 				"--debug": Boolean,
 
 				"-u": "--username",
@@ -631,6 +633,14 @@ class SteamCardFarmer {
 
 				if (CYCLE_DELAY < 0) {
 					throw new Error("--cycle-delay must be positive.");
+				}
+			}
+
+			if (typeof args["--cycle-apps"] !== "undefined") {
+				CYCLE_APPS_AT_ONCE = args["--cycle-apps"];
+
+				if (CYCLE_APPS_AT_ONCE < 1) {
+					throw new Error("--cycle-apps must be positive.");
 				}
 			}
 
