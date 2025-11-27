@@ -36,9 +36,9 @@ Name | Description
 `--password` or `-p` | steam password
 `--concurrent-apps` | how many apps to idle at once (32 by default)
 `--min-playtime` | minimum playtime in minutes without cycling (180 minutes by default)
-`--cycle-minutes` | how many minutes to wait between cycles (5 minutes by default)
+`--cycle-minutes` | how many minutes to wait between cycles (10 minutes by default)
 `--cycle-delay` | how many milliseconds to wait between cycling apps (10 seconds by default)
-`--cycle-apps` | how many apps to cycle (quit) at once (1 by default)
+`--cycle-apps` | how many apps to cycle (quit) at once (4 by default)
 
 Use `--min-playtime 0` if your account is not limited due to refunds and you get card drops from zero minutes of playtime.
 

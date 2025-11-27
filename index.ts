@@ -23,7 +23,7 @@ const { dirname } = import.meta;
 
 let MAX_APPS_AT_ONCE = 32; // how many apps to idle at once
 let MIN_PLAYTIME_TO_IDLE = 180; // minimum playtime in minutes without cycling
-let CYCLE_MINUTES_BETWEEN = 5;
+let CYCLE_MINUTES_BETWEEN = 10;
 let CYCLE_DELAY = 10000; // how many milliseconds to wait between cycling apps
 let CYCLE_APPS_AT_ONCE = 4; // how many apps to cycle (quit) at once
 
