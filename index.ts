@@ -131,6 +131,8 @@ class SteamCardFarmer {
 			return;
 		}
 
+		this.log(chalk.red(`${e.toString()} (${SteamUser.EResult[e.eresult] || e.eresult})`));
+
 		const badTokenErrors = [
 			SteamUser.EResult.AccessDenied,
 			SteamUser.EResult.Expired,
@@ -141,9 +143,11 @@ class SteamCardFarmer {
 
 		if (badTokenErrors.includes(e.eresult)) {
 			await unlinkFile(this.getRefreshTokenFilename());
+
+			return;
 		}
 
-		this.log(chalk.red(`${e.toString()} (${SteamUser.EResult[e.eresult] || e.eresult})`));
+		this.checkTimer = setTimeout(() => this.client.logOn(true), 10000);
 	}
 
 	onDisconnected(eResult: SteamUser.EResult, msg?: string): void {
