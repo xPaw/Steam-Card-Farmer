@@ -128,6 +128,8 @@ class SteamCardFarmer {
 
 			this.log(chalk.red("Another client logged in elsewhere."));
 
+			this.checkTimer = setTimeout(() => this.client.logOn(true), 10000);
+
 			return;
 		}
 
@@ -143,6 +145,8 @@ class SteamCardFarmer {
 
 		if (badTokenErrors.includes(e.eresult)) {
 			await unlinkFile(this.getRefreshTokenFilename());
+
+			this.shutdown(1); // Needs a full restart to enter credentials again
 
 			return;
 		}
@@ -230,6 +234,7 @@ class SteamCardFarmer {
 		} catch (err) {
 			this.log(chalk.red(`Page ${page}: failed to load: ${err}`));
 
+			clearTimeout(this.checkTimer);
 			this.checkTimer = setTimeout(() => this.requestBadgesPage(page, syncOnly), 30000);
 			return;
 		}
@@ -403,6 +408,7 @@ class SteamCardFarmer {
 					await this.cycleApps(appids);
 				}
 
+				clearTimeout(this.checkTimer);
 				this.checkTimer = setTimeout(() => {
 					if (this.appsWithDrops.length === 0) {
 						this.log(chalk.green("No drops remaining, checking badges page again."));
