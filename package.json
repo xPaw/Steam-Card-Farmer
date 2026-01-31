@@ -24,8 +24,8 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.2.4",
-		"@types/jsdom": "^21.1.7",
-		"@types/node": "^20.0.0",
+		"@types/jsdom": "^27.0.0",
+		"@types/node": "^25.1.0",
 		"@types/steam-user": "^5.1.0",
 		"typescript": "^5.4.3"
 	}
