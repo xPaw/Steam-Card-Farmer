@@ -469,6 +469,7 @@ class SteamCardFarmer {
 		this.log("Cycling apps...");
 
 		let current = CYCLE_APPS_AT_ONCE;
+		let remaining: number[];
 
 		do {
 			await setTimeoutAsync(CYCLE_DELAY);
@@ -479,10 +480,11 @@ class SteamCardFarmer {
 			}
 
 			// quit apps until the list is empty
-			this.client.gamesPlayed(appids.slice(current));
+			remaining = appids.slice(current);
+			this.client.gamesPlayed(remaining);
 
 			current += CYCLE_APPS_AT_ONCE;
-		} while (current <= appids.length);
+		} while (remaining.length > 0);
 	}
 
 	onNotificationsReceived(payload: NotificationsPayload): void {
