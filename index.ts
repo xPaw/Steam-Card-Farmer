@@ -54,6 +54,7 @@ interface NotificationsPayload {
 interface GetAppsToPlayResult {
 	requiresIdling: boolean;
 	appsToPlay: AppWithDrops[];
+	medianPlaytime: number;
 }
 
 function arrayTakeFirst<T>(arr: T[], end: number): T[] {
@@ -354,7 +355,7 @@ class SteamCardFarmer {
 
 		const temp = this.getAppsToPlay();
 		let { requiresIdling } = temp;
-		const { appsToPlay } = temp;
+		const { appsToPlay, medianPlaytime } = temp;
 		const appids = appsToPlay.map(({ appid }) => appid);
 
 		this.client.gamesPlayed(appids);
@@ -362,9 +363,8 @@ class SteamCardFarmer {
 		let idleMinutes = CYCLE_MINUTES_BETWEEN;
 
 		if (requiresIdling) {
-			// take the median time until minimum playtime is reached and then check again
-			const medianPlaytime = appsToPlay[Math.floor(appsToPlay.length / 2)];
-			idleMinutes = MIN_PLAYTIME_TO_IDLE - medianPlaytime.playtime;
+			// idle until the median app reaches the minimum playtime, then re-check
+			idleMinutes = MIN_PLAYTIME_TO_IDLE - medianPlaytime;
 
 			if (idleMinutes < CYCLE_MINUTES_BETWEEN) {
 				requiresIdling = false;
@@ -454,15 +454,17 @@ class SteamCardFarmer {
 			requiresIdling = true;
 			appsToPlay = appsUnderMinPlaytime;
 		} else {
-			appsToPlay = this.appsWithDrops;
+			appsToPlay = [...this.appsWithDrops];
 		}
 
 		appsToPlay.sort((a, b) => b.playtime - a.playtime);
 		appsToPlay = arrayTakeFirst(appsToPlay, MAX_APPS_AT_ONCE);
 
+		const medianPlaytime = appsToPlay[Math.floor(appsToPlay.length / 2)].playtime;
+
 		arrayShuffle(appsToPlay);
 
-		return { requiresIdling, appsToPlay };
+		return { requiresIdling, appsToPlay, medianPlaytime };
 	}
 
 	async cycleApps(appids: number[]): Promise<void> {
