@@ -20,7 +20,7 @@
 		"arg": "^5.0.2",
 		"enquirer": "^2.4.1",
 		"jsdom": "^29.0.0",
-		"protobufjs": "^8.6.1",
+		"protobufjs": "^8.6.6",
 		"steam-user": "^5.0.1"
 	},
 	"devDependencies": {
